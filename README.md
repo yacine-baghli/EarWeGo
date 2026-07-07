@@ -1,5 +1,7 @@
 # Huawei Tech Arena 2026 — Pinna Landmark Extraction
 
+![system_overview](img/Overview.png)
+
 This repository contains a professional implementation of a hybrid 3D geometry pipeline to automatically extract **85 pinna (outer ear) landmarks** from human head scans. The solution runs **entirely landmark-free at test time**, utilizing surface curvature, shape priors, and statistical regression to achieve high precision and robustness.
 
 ## System Architecture
