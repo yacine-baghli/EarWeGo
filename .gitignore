@@ -1,0 +1,20 @@
+# Ignore the data
+2026 Munich Tech Arena - Datas/
+2026 Munich Tech Arena - Datas.zip
+
+# Python temporary files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Scratch folder (temporary scripts)
+scratch/
+
+# IDE configurations
+.vscode/
+.idea/
+.gemini/
