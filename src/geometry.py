@@ -145,6 +145,71 @@ def icp(
     return src, R_total, t_total
 
 
+def robust_icp(
+    source: np.ndarray,
+    target: np.ndarray,
+    max_iterations: int = 100,
+    tolerance: float = 1e-8,
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """
+    Robust ICP with multi-start translation offsets to prevent local minima drift.
+    
+    Args:
+        source: (N, 3) template landmarks.
+        target: (M, 3) segmented mesh vertices.
+        max_iterations: Max full ICP iterations.
+        tolerance: Convergence threshold.
+        
+    Returns:
+        aligned: (N, 3) aligned landmarks.
+        R: rotation matrix.
+        t: translation vector.
+    """
+    # Initialize centroids
+    src_mean = source.mean(axis=0)
+    tgt_mean = target.mean(axis=0)
+    
+    # Pre-align centroids
+    centroid_aligned_source = source + (tgt_mean - src_mean)
+    
+    # Offsets in X, Y, Z to test (mm)
+    offsets = [
+        np.array([0.0, 0.0, 0.0]),
+        np.array([15.0, 0.0, 0.0]),
+        np.array([-15.0, 0.0, 0.0]),
+        np.array([0.0, 10.0, 0.0]),
+        np.array([0.0, -10.0, 0.0]),
+        np.array([0.0, 0.0, 15.0]),
+        np.array([0.0, 0.0, -15.0]),
+    ]
+    
+    best_error = float("inf")
+    best_start_src = centroid_aligned_source
+    
+    # Find the best translation offset using a quick ICP run
+    target_tree = cKDTree(target)
+    for offset in offsets:
+        shifted_src = centroid_aligned_source + offset
+        try:
+            # Quick 15-iteration ICP run
+            src_temp, _, _ = icp(
+                shifted_src, target, max_iterations=15, tolerance=1e-4
+            )
+            dists, _ = target_tree.query(src_temp)
+            mean_err = dists.mean()
+            
+            if mean_err < best_error:
+                best_error = mean_err
+                best_start_src = shifted_src
+        except Exception:
+            pass
+            
+    # Run full ICP from the best starting position
+    return icp(
+        best_start_src, target, max_iterations=max_iterations, tolerance=tolerance
+    )
+
+
 # ─── Mirror Landmarks ───────────────────────────────────────────────────────
 
 def mirror_landmarks_y(landmarks: np.ndarray) -> np.ndarray:
@@ -386,3 +451,122 @@ def generalized_procrustes(
             break
     
     return aligned, mean_shape
+
+
+# ─── Contour Spline Resampling ────────────────────────────────────────────────
+
+def resample_contours(landmarks: np.ndarray) -> np.ndarray:
+    """
+    Enforce anatomical contour spacing constraints via cubic spline resampling.
+    63 of the 85 landmarks are intermediate points along 4 contours:
+      1. Outer Helix (0-24, anchors at 0, 6, 22, 24)
+      2. Concha Outline (25-54, anchors at 25, 33, 42, 46, 50, 54)
+      3. Inner Helix (55-74, anchors at 55, 64; extrapolated to 74)
+      4. Superior Antihelix (75-84, anchors at 75, 84)
+      
+    Args:
+        landmarks: (85, 3) array of predicted landmarks.
+        
+    Returns:
+        resampled: (85, 3) array with contour constraints strictly enforced.
+    """
+    from scipy.interpolate import CubicSpline
+    
+    resampled = landmarks.copy()
+    
+    # ─── Helper function to resample a single segment of a spline ───
+    def resample_spline_segment(spline, t_start, t_end, num_points):
+        t_high = np.linspace(t_start, t_end, 500)
+        pts_high = spline(t_high)
+        
+        # Cumulative arc lengths
+        dists = np.linalg.norm(np.diff(pts_high, axis=0), axis=1)
+        arc_lengths = np.concatenate(([0], np.cumsum(dists)))
+        total_len = arc_lengths[-1]
+        
+        if total_len < 1e-6:
+            return np.linspace(spline(t_start), spline(t_end), num_points)
+            
+        # Target equally spaced arc lengths
+        target_lens = np.linspace(0, total_len, num_points)
+        
+        # Interpolate parameter t as function of arc length
+        t_sampled = np.interp(target_lens, arc_lengths, t_high)
+        return spline(t_sampled)
+
+    # ─── 1. Outer Helix (0-24) ───
+    # Fit spline to the raw predicted outer helix points to capture shape
+    idx_helix = np.arange(25)
+    helix_pts = landmarks[idx_helix]
+    t_helix = np.concatenate(([0], np.cumsum(np.linalg.norm(np.diff(helix_pts, axis=0), axis=1))))
+    spline_helix = CubicSpline(t_helix, helix_pts, bc_type='natural')
+    
+    # Resample each segment between anchors: [0, 6], [6, 22], [22, 24]
+    anchors_helix = [0, 6, 22, 24]
+    for start_idx, end_idx in zip(anchors_helix[:-1], anchors_helix[1:]):
+        n_pts = end_idx - start_idx + 1
+        resampled[start_idx:end_idx+1] = resample_spline_segment(
+            spline_helix, t_helix[start_idx], t_helix[end_idx], n_pts
+        )
+
+    # ─── 2. Concha Outline (25-54) ───
+    idx_concha = np.arange(25, 55)
+    concha_pts = landmarks[idx_concha]
+    t_concha = np.concatenate(([0], np.cumsum(np.linalg.norm(np.diff(concha_pts, axis=0), axis=1))))
+    spline_concha = CubicSpline(t_concha, concha_pts, bc_type='natural')
+    
+    # Anchors: 25, 33, 42, 46, 50, 54
+    anchors_concha = [25, 33, 42, 46, 50, 54]
+    for start_idx, end_idx in zip(anchors_concha[:-1], anchors_concha[1:]):
+        n_pts = end_idx - start_idx + 1
+        # Convert absolute indices to concha-relative indices for parameter lookup
+        rel_start = start_idx - 25
+        rel_end = end_idx - 25
+        resampled[start_idx:end_idx+1] = resample_spline_segment(
+            spline_concha, t_concha[rel_start], t_concha[rel_end], n_pts
+        )
+
+    # ─── 3. Inner Helix (55-74) ───
+    # Spacing between 64 and 74 must equal the spacing of the segment 55-64
+    idx_inner = np.arange(55, 65)  # Points 55 to 64
+    inner_pts = landmarks[idx_inner]
+    t_inner = np.concatenate(([0], np.cumsum(np.linalg.norm(np.diff(inner_pts, axis=0), axis=1))))
+    spline_inner = CubicSpline(t_inner, inner_pts, bc_type='natural')
+    
+    # Resample the active segment 55-64 (10 points)
+    resampled_55_64 = resample_spline_segment(spline_inner, t_inner[0], t_inner[-1], 10)
+    resampled[55:65] = resampled_55_64
+    
+    # Spacing interval
+    dists_55_64 = np.linalg.norm(np.diff(resampled_55_64, axis=0), axis=1)
+    step_size = dists_55_64.mean()
+    
+    # Extrapolate for remaining 10 points (65 to 74)
+    # We sample beyond t_inner[-1] at increments that match step_size along the curve
+    t_extrapolated = []
+    t_curr = t_inner[-1]
+    
+    # Determine local derivative at the end of the spline to estimate parameter step
+    deriv = spline_inner.derivative()(t_curr)
+    deriv_norm = np.linalg.norm(deriv)
+    t_step = step_size / (deriv_norm + 1e-10)
+    
+    for _ in range(10):
+        t_curr += t_step
+        t_extrapolated.append(t_curr)
+        # Update t_step dynamically based on the local derivative at the new point
+        new_deriv = spline_inner.derivative()(t_curr)
+        t_step = step_size / (np.linalg.norm(new_deriv) + 1e-10)
+        
+    resampled[65:75] = spline_inner(t_extrapolated)
+
+    # ─── 4. Superior Antihelix (75-84) ───
+    idx_antihelix = np.arange(75, 85)
+    anti_pts = landmarks[idx_antihelix]
+    t_anti = np.concatenate(([0], np.cumsum(np.linalg.norm(np.diff(anti_pts, axis=0), axis=1))))
+    spline_anti = CubicSpline(t_anti, anti_pts, bc_type='natural')
+    
+    resampled[75:85] = resample_spline_segment(spline_anti, t_anti[0], t_anti[-1], 10)
+    
+    return resampled
+

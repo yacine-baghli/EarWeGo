@@ -32,7 +32,7 @@ from src.data_loader import (
 from src.geometry import (
     procrustes_align, apply_procrustes_transform,
     mirror_landmarks_y, generalized_procrustes,
-    StatisticalShapeModel, icp,
+    StatisticalShapeModel, icp, robust_icp, snap_to_mesh,
 )
 
 
@@ -131,17 +131,45 @@ class LandmarkPredictor:
         X_data = []
         Y_data = {i: [] for i in range(NUM_LANDMARKS)}
         
+        # We augment each training sample with different random perturbations to simulate alignment noise
+        n_augmentations = 5
+        np.random.seed(42)
+        from scipy.spatial.transform import Rotation
+        
         for idx in range(2 * n):
-            coeff = self.ssm_coefficients[idx]
-            reconstructed = self.ssm.reconstruct(coeff)
             actual = self.aligned_shapes[idx]
             
-            # Compute residual per landmark
-            residual = actual - reconstructed  # (85, 3)
-            
+            # Clean sample
+            coeff = self.ssm_coefficients[idx]
+            reconstructed = self.ssm.reconstruct(coeff)
             X_data.append(coeff)
             for i in range(NUM_LANDMARKS):
-                Y_data[i].append(residual[i])
+                Y_data[i].append(actual[i] - reconstructed[i])
+                
+            # Perturbed samples
+            for _ in range(n_augmentations):
+                # Small random translation
+                t = np.random.normal(0, 1.5, size=3)  # std = 1.5mm
+                # Small random rotation
+                angles = np.random.normal(0, 1.0, size=3)  # std = 1.0 degree
+                R = Rotation.from_euler('xyz', angles, degrees=True).as_matrix()
+                # Small random scale
+                s = np.random.normal(1.0, 0.02)  # std = 2%
+                
+                # Apply rigid perturbation
+                perturbed = s * (actual @ R) + t
+                
+                # Align perturbed back to SSM space (simulating test-time ICP alignment)
+                aligned_p, _ = procrustes_align(perturbed, self.ssm.get_mean_shape(), allow_scale=True)
+                
+                # Project and reconstruct
+                coeff_p = self.ssm.project(aligned_p)
+                reconstructed_p = self.ssm.reconstruct(coeff_p)
+                
+                X_data.append(coeff_p)
+                for i in range(NUM_LANDMARKS):
+                    # Target residual is the difference between the true GPA coordinate and the perturbed SSM reconstruction
+                    Y_data[i].append(actual[i] - reconstructed_p[i])
         
         X_data = np.array(X_data)
         
@@ -209,12 +237,13 @@ class LandmarkPredictor:
                     ear_mask = mesh_verts[:, 1] > 0 if side == "left" else mesh_verts[:, 1] < 0
                     ear_verts = mesh_verts[ear_mask]
             
-            # Align template using ICP
+            # Align template using bounded distance ICP
             try:
                 initial, _, _ = icp(
                     template, ear_verts,
                     max_iterations=100,
                     tolerance=1e-8,
+                    max_correspondence_dist=15.0,
                 )
             except Exception:
                 initial = template.copy()
@@ -255,11 +284,10 @@ class LandmarkPredictor:
         knn_result = self._knn_predict(coeff, side)
         result = self.blend_alpha * result + (1.0 - self.blend_alpha) * knn_result
         
-        # Step 6: Proximity query snap to surface
+        # Step 6: Snap to nearest mesh vertices using KDTree
         if mesh is not None:
             try:
-                closest, _, _ = mesh.nearest.on_surface(result)
-                result = closest
+                result = snap_to_mesh(result, np.array(mesh.vertices))
             except Exception:
                 pass
                 
