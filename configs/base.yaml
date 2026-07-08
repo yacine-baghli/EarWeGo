@@ -1,0 +1,70 @@
+# ============================================================================
+# EarWeGo — Base Configuration
+# ============================================================================
+# Every tunable hyperparameter in the pipeline. Version configs override only
+# what they change. Values here are transcribed directly from the source code.
+
+seed: 42
+
+# ─── Data paths ──────────────────────────────────────────────────────────────
+data:
+  root: "2026 Munich Tech Arena - Datas/2026 Munich Tech Arena - Datas"
+  splits_dir: "data/splits"
+
+# ─── Evaluation ──────────────────────────────────────────────────────────────
+eval:
+  split: "val"
+  thresholds_mm: [2, 3, 5, 10]
+  failure_threshold_mm: 10.0
+
+# ─── LandmarkPredictor (src/predictor.py) ────────────────────────────────────
+model:
+  # SSM
+  n_ssm_components: 30          # predictor.py:47  StatisticalShapeModel(n_components=...)
+  # KNN blending
+  k_neighbors: 7                # predictor.py:48
+  blend_alpha: 0.6              # predictor.py:50  SSM+GBR weight (1-alpha = KNN weight)
+  feature_radius: 5.0           # predictor.py:49  (unused in default GBR path)
+  use_regressors: true           # predictor.py:74  train_with_regressors
+
+  # GBR regressor hyperparams (predictor.py:182–188)
+  gbr_n_estimators: 50
+  gbr_max_depth: 3
+  gbr_learning_rate: 0.1
+  gbr_subsample: 0.8
+  gbr_random_state: 42
+
+  # Data augmentation during GBR training (predictor.py:135–157)
+  n_augmentations: 5
+  augment_translation_std: 1.5   # mm
+  augment_rotation_std: 1.0      # degrees
+  augment_scale_std: 0.02        # fraction (2%)
+
+# ─── EarDetector (src/ear_detector.py) ───────────────────────────────────────
+detector:
+  curvature_radius: 3.0          # ear_detector.py:56
+  curvature_threshold_factor: 2.5 # ear_detector.py:57
+  ear_margin: 20.0               # ear_detector.py:58  mm
+  y_percentile_lateral: 90       # ear_detector.py:59
+  n_curvature_samples: 10000     # ear_detector.py:60
+  n_mesh_samples: 30             # ear_detector.py:88  fit() default
+  extract_ear_margin: 10.0       # ear_detector.py:157  extract_ear_region margin
+
+# ─── ICP alignment (src/geometry.py, called from predictor.py:242–247) ───────
+icp:
+  max_iterations: 100            # predictor.py:244
+  tolerance: 1.0e-8              # predictor.py:245
+  max_correspondence_dist: 15.0  # predictor.py:246  mm, bounds correspondences
+
+# ─── GPA (src/geometry.py:415–419) ───────────────────────────────────────────
+gpa:
+  max_iterations: 20             # geometry.py:417
+  tolerance: 1.0e-6              # geometry.py:418
+
+# ─── Curvature estimation (src/geometry.py:253) ─────────────────────────────
+curvature:
+  k_neighbors: 15                # geometry.py:253  compute_curvature_estimate default
+
+# ─── Local features (src/geometry.py:283) ───────────────────────────────────
+local_features:
+  radius: 5.0                    # geometry.py:283  compute_local_features default

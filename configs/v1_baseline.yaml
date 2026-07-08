@@ -1,0 +1,5 @@
+# V1 Baseline — captures the exact hyperparameters from the first working pipeline.
+# Inherits all defaults from base.yaml; overrides nothing.
+_base: base.yaml
+name: v1_baseline
+description: "SSM(30) + GBR(50 trees) + KNN(7), blend_alpha=0.6, ICP max_corr=15mm"

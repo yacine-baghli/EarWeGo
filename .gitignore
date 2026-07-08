@@ -1,8 +1,11 @@
-# Ignore the data
+# ─── Data (large, local-only) ────────────────────────────────────────────────
 2026 Munich Tech Arena - Datas/
 2026 Munich Tech Arena - Datas.zip
+# Only ignore the large data subdirectories, NOT data/splits/ (must be committed)
+data/mesh/
+data/landmarks/
 
-# Python temporary files
+# ─── Python temporary files ──────────────────────────────────────────────────
 __pycache__/
 *.pyc
 *.pyo
@@ -11,23 +14,41 @@ __pycache__/
 .venv/
 venv/
 
-# Trained model checkpoints (large binaries)
+# ─── Model weights (large binaries, local-only) ─────────────────────────────
 models/
 
-# Experiments (models + results per run)
+# ─── Run artifacts (large, local-only) ──────────────────────────────────────
+# Weights and generated plots/CSVs are local-only.
+# Metadata, configs, and summaries ARE committed (small, shared ledger).
+runs/*/weights/
+runs/*/results/*.csv
+runs/*/results/*.png
+runs/*/logs/
+
+# ─── Legacy directories ─────────────────────────────────────────────────────
 experiments/
-
-# Evaluation output (generated plots/reports)
 output/
+splits/
 
-# Scratch folder (temporary scripts)
+# ─── Distribution / packaging ───────────────────────────────────────────────
+dist/
+*.zip
+
+# ─── Scratch folder (temporary scripts) ─────────────────────────────────────
 scratch/
 
-# IDE configurations
+# ─── IDE configurations ─────────────────────────────────────────────────────
 .vscode/
 .idea/
 .gemini/
 
-# Subprojects
+# ─── Subprojects ────────────────────────────────────────────────────────────
 LeaderBoard/
 
+# ─── COMMITTED (do NOT gitignore these): ────────────────────────────────────
+# configs/**
+# data/splits/*.txt
+# runs/index.csv
+# runs/*/config.resolved.yaml
+# runs/*/metadata.json
+# runs/*/results/summary_*.json

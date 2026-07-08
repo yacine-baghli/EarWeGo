@@ -4,3 +4,4 @@ trimesh
 scipy
 pandas
 scikit-learn
+pyyaml

@@ -1,0 +1,53 @@
+seed: 42
+data:
+  root: C:\Yacine\doc\Polytech\Python\Huawei_tech_arena\2026 Munich Tech Arena - Datas\2026
+    Munich Tech Arena - Datas
+  splits_dir: C:\Yacine\doc\Polytech\Python\Huawei_tech_arena\data\splits
+  mesh_dir: C:\Yacine\doc\Polytech\Python\Huawei_tech_arena\2026 Munich Tech Arena
+    - Datas\2026 Munich Tech Arena - Datas\mesh
+  landmarks_dir: C:\Yacine\doc\Polytech\Python\Huawei_tech_arena\2026 Munich Tech
+    Arena - Datas\2026 Munich Tech Arena - Datas\landmarks
+eval:
+  split: val
+  thresholds_mm:
+  - 2
+  - 3
+  - 5
+  - 10
+  failure_threshold_mm: 10.0
+model:
+  n_ssm_components: 30
+  k_neighbors: 7
+  blend_alpha: 0.6
+  feature_radius: 5.0
+  use_regressors: true
+  gbr_n_estimators: 50
+  gbr_max_depth: 3
+  gbr_learning_rate: 0.1
+  gbr_subsample: 0.8
+  gbr_random_state: 42
+  n_augmentations: 5
+  augment_translation_std: 1.5
+  augment_rotation_std: 1.0
+  augment_scale_std: 0.02
+detector:
+  curvature_radius: 3.0
+  curvature_threshold_factor: 2.5
+  ear_margin: 20.0
+  y_percentile_lateral: 90
+  n_curvature_samples: 10000
+  n_mesh_samples: 30
+  extract_ear_margin: 10.0
+icp:
+  max_iterations: 100
+  tolerance: 1.0e-08
+  max_correspondence_dist: 15.0
+gpa:
+  max_iterations: 20
+  tolerance: 1.0e-06
+curvature:
+  k_neighbors: 15
+local_features:
+  radius: 5.0
+name: v1_baseline
+description: SSM(30) + GBR(50 trees) + KNN(7), blend_alpha=0.6, ICP max_corr=15mm

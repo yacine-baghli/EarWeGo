@@ -10,7 +10,7 @@ TEST_PROP = 0.15
 # Directories relative to repository root
 SRC_DIR = Path(__file__).resolve().parent
 ROOT_DIR = SRC_DIR.parent
-SPLITS_DIR = ROOT_DIR / "splits"
+SPLITS_DIR = ROOT_DIR / "data" / "splits"
 DEFAULT_MESH_DIR = ROOT_DIR / "2026 Munich Tech Arena - Datas" / "2026 Munich Tech Arena - Datas" / "mesh"
 
 def make_splits(pids: list[str], seed: int = SPLIT_SEED) -> tuple[list[str], list[str], list[str]]:
