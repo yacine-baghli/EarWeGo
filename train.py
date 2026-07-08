@@ -108,7 +108,7 @@ def main():
         print(f"Training split:      {args.split}")
     print(f"SSM components:      {args.n_components}")
     print(f"KNN neighbors:       {args.k_neighbors}")
-    print(f"Blend weight (α):    {args.blend_alpha}")
+    print(f"Blend weight (alpha): {args.blend_alpha}")
     print("=" * 72)
     
     # Loud guard: Prevent training on test partition to protect evaluation validity

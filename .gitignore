@@ -11,6 +11,12 @@ __pycache__/
 .venv/
 venv/
 
+# Trained model checkpoints (large binaries)
+models/
+
+# Evaluation output (generated plots/reports)
+output/
+
 # Scratch folder (temporary scripts)
 scratch/
 
