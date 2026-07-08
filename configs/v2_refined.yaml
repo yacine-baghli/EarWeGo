@@ -1,13 +1,13 @@
-# V2 Refined — Enable all three post-prediction refinement stages
-# Inherits from base.yaml; only overrides the refinement flags.
+# V2 Refined — Contour resampling + selective snap (no scale clamp)
+# Scale clamp dropped: transform["s"] is the SSM-normalization scale (~0.01-0.02),
+# NOT a predicted-vs-truth size ratio. Clamping it is meaningless.
 _base: base.yaml
 name: v2_refined
-description: "v1 + scale clamping + contour resampling + selective snap (anchors only)"
+description: "v1 + contour resampling + selective anchor snap (no clamp)"
 
 model:
   refine:
-    clamp: true
-    scale_bounds: [0.92, 1.08]
+    clamp: false
     resample: true
     selective_snap: true
     legacy_snap: false

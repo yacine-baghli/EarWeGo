@@ -1,97 +1,138 @@
 """
-Measure the real impact of each refinement on your validation split.
+Ablation test: evaluate the same v1 weights with different refinement flags.
+No retraining needed — refinements are post-prediction.
 
-Run this on the machine with the dataset AFTER wiring refinement.py into
-predictor.predict() (see INTEGRATION.md). It evaluates the SAME fitted model under
-several refinement configs and prints MD / worst / P90 / per-region so you can see
-exactly which flag helps and by how much — before committing to a v2.
-
-    python ab_test.py --weights runs/<run_id>/weights/predictor.pkl \
-                      --split-file data/splits/val_pids.txt
-
-Compares: baseline (legacy snap) vs +clamp vs +resample vs +selective_snap vs all.
-Nothing here changes the model; it only toggles post-hoc refinement flags.
+Configs tested:
+  A) baseline         — refine={}  (legacy snap)
+  B) +resample        — resample only
+  C) +selective_snap  — selective snap only (no legacy snap)
+  D) resample+snap    — both on
 """
-from __future__ import annotations
-import argparse, pickle, sys
-from pathlib import Path
+
+import json
 import numpy as np
+import sys
+import time
+from pathlib import Path
 
-# import the repo's modules
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from src.data_loader import load_mesh, load_landmarks, MESH_DIR, LANDMARK_DIR
-try:
-    from src.ear_detector import EarDetector
-except Exception:
-    EarDetector = None
 
-CONTOURS = {"outer_helix": (0, 25), "concha": (25, 55),
-            "inner_helix": (55, 75), "sup_antihelix": (75, 85)}
+from src.dataset import Dataset
+from src.ear_detector import EarDetector
+from src.predictor import LandmarkPredictor
+from src.metrics import compute_mean_landmark_distance
 
-CONFIGS = {
-    "baseline (legacy snap)": {"legacy_snap": True},
-    "+clamp":                 {"clamp": True, "legacy_snap": True},
-    "+resample":              {"resample": True, "legacy_snap": True},
-    "+selective_snap":        {"selective_snap": True},
-    "ALL (clamp+resample+sel)": {"clamp": True, "resample": True, "selective_snap": True},
+# ─── Paths ───────────────────────────────────────────────────────────────────
+ROOT = Path(__file__).resolve().parent
+DATA_ROOT = ROOT / "2026 Munich Tech Arena - Datas" / "2026 Munich Tech Arena - Datas"
+MESH_DIR = str(DATA_ROOT / "mesh")
+LM_DIR = str(DATA_ROOT / "landmarks")
+WEIGHTS = ROOT / "models"
+
+# ─── Ablation configs ────────────────────────────────────────────────────────
+ABLATIONS = {
+    "A_baseline": {},
+    "B_resample": {"resample": True, "selective_snap": False, "legacy_snap": True},
+    "C_selective_snap": {"resample": False, "selective_snap": True, "legacy_snap": False},
+    "D_resample+snap": {"resample": True, "selective_snap": True, "legacy_snap": False},
+}
+
+# Per-region index ranges
+REGIONS = {
+    "Outer_Helix_0-24":    list(range(0, 25)),
+    "Concha_25-54":        list(range(25, 55)),
+    "Inner_Helix_55-74":   list(range(55, 75)),
+    "Sup_Antihelix_75-84": list(range(75, 85)),
 }
 
 
-def per_ear(pred, gt):
-    return np.linalg.norm(pred - gt, axis=1)
+def per_region_mle(pred, gt, region_indices):
+    """Mean landmark error for a subset of indices."""
+    return float(np.mean(np.linalg.norm(pred[region_indices] - gt[region_indices], axis=1)))
 
 
-def evaluate(predictor, pairs, refine):
-    """pairs: list of (mesh, side, gt(85,3)). Returns dict of aggregate metrics."""
-    per_ear_md, region = [], {k: [] for k in CONTOURS}
-    detector = EarDetector() if EarDetector is not None else None
-    for mesh, side, gt in pairs:
-        pred = predictor.predict(mesh, side=side, ear_detector=detector, refine=refine)
-        d = per_ear(pred, gt)
-        per_ear_md.append(d.mean())
-        for name, (lo, hi) in CONTOURS.items():
-            region[name].append(d[lo:hi].mean())
-    a = np.array(per_ear_md)
-    out = {"MD": a.mean(), "median": np.median(a), "worst": a.max(),
-           "P90": np.percentile(a, 90), "std": a.std()}
-    for name in CONTOURS:
-        out[name] = float(np.mean(region[name]))
-    return out
+def run_ablation():
+    # Load models once
+    print("Loading models...")
+    detector = EarDetector()
+    detector.load(WEIGHTS / "ear_detector.pkl")
+    predictor = LandmarkPredictor()
+    predictor.load(WEIGHTS / "landmark_predictor.pkl")
 
+    # Load val dataset
+    dataset = Dataset(mesh_dir=MESH_DIR, landmarks_dir=LM_DIR, split="val")
+    n = len(dataset)
+    print(f"Evaluating on {n} val subjects x 2 ears = {n*2} predictions\n")
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--weights", required=True)
-    ap.add_argument("--split-file", required=True, help="val_pids.txt")
-    ap.add_argument("--mesh-dir", default=str(MESH_DIR))
-    ap.add_argument("--landmarks-dir", default=str(LANDMARK_DIR))
-    a = ap.parse_args()
+    results = {}
 
-    with open(a.weights, "rb") as f:
-        predictor = pickle.load(f)
+    for label, refine in ABLATIONS.items():
+        print(f"{'='*60}")
+        print(f"  {label}  refine={refine}")
+        print(f"{'='*60}")
 
-    pids = [p.strip() for p in Path(a.split_file).read_text().split() if p.strip()]
-    md, ld = Path(a.mesh_dir), Path(a.landmarks_dir)
-    pairs = []
-    for pid in pids:
-        mesh = load_mesh(md / f"{pid}.ply")
-        for side in ("left", "right"):
-            gt = load_landmarks(ld / f"{pid}_{side}_ear_landmarks.csv")
-            pairs.append((mesh, side, gt))
-    print(f"Evaluating {len(pids)} subjects ({len(pairs)} ears)\n")
+        subject_dists = []
+        region_dists = {r: [] for r in REGIONS}
+        t0 = time.time()
 
-    rows = {name: evaluate(predictor, pairs, refine) for name, refine in CONFIGS.items()}
+        for idx in range(n):
+            pid = dataset.get_identifier(idx)
+            mesh, gt_left, gt_right = dataset[idx]
 
-    base = rows["baseline (legacy snap)"]["MD"]
-    cols = ["MD", "median", "worst", "P90", "inner_helix", "concha", "outer_helix"]
-    hdr = f'{"config":26s} ' + " ".join(f"{c:>11s}" for c in cols) + "   ΔMD"
-    print(hdr); print("-" * len(hdr))
-    for name, m in rows.items():
-        delta = m["MD"] - base
-        line = f'{name:26s} ' + " ".join(f"{m[c]:11.3f}" for c in cols)
-        print(line + f"   {delta:+.3f}")
-    print("\nΔMD < 0 means the refinement helped. Pick the winning combination as v2.")
+            pred_l = predictor.predict(mesh, side="left", ear_detector=detector, refine=refine)
+            pred_r = predictor.predict(mesh, side="right", ear_detector=detector, refine=refine)
+
+            d_l = compute_mean_landmark_distance(pred_l, gt_left)
+            d_r = compute_mean_landmark_distance(pred_r, gt_right)
+            subject_dists.append((d_l + d_r) / 2)
+
+            # Per-region (both ears averaged)
+            for rname, ridx in REGIONS.items():
+                rl = per_region_mle(pred_l, gt_left, ridx)
+                rr = per_region_mle(pred_r, gt_right, ridx)
+                region_dists[rname].append((rl + rr) / 2)
+
+        elapsed = time.time() - t0
+        md = float(np.mean(subject_dists))
+        print(f"  MD = {md:.4f} mm  (median={np.median(subject_dists):.4f}, "
+              f"worst={np.max(subject_dists):.4f})  [{elapsed:.1f}s]")
+        for rname in REGIONS:
+            rmean = float(np.mean(region_dists[rname]))
+            print(f"    {rname:25s}: {rmean:.4f} mm")
+
+        results[label] = {
+            "MD": md,
+            "median": float(np.median(subject_dists)),
+            "worst": float(np.max(subject_dists)),
+            "regions": {r: float(np.mean(region_dists[r])) for r in REGIONS},
+        }
+
+    # ─── Summary table ───────────────────────────────────────────────────
+    baseline_md = results["A_baseline"]["MD"]
+    print(f"\n{'='*80}")
+    print(f"  ABLATION SUMMARY  (baseline MD = {baseline_md:.4f} mm)")
+    print(f"{'='*80}")
+    header = f"{'Config':<25} {'MD':>8} {'delta':>8} {'Helix':>8} {'Concha':>8} {'Inner':>8} {'Antihlx':>8}"
+    print(header)
+    print("-" * 80)
+
+    for label, res in results.items():
+        delta = res["MD"] - baseline_md
+        sign = "+" if delta >= 0 else ""
+        rg = res["regions"]
+        print(f"{label:<25} {res['MD']:>8.4f} {sign}{delta:>7.4f} "
+              f"{rg['Outer_Helix_0-24']:>8.4f} {rg['Concha_25-54']:>8.4f} "
+              f"{rg['Inner_Helix_55-74']:>8.4f} {rg['Sup_Antihelix_75-84']:>8.4f}")
+
+    print("=" * 80)
+
+    # Save
+    out = ROOT / "output" / "ablation_results.json"
+    out.parent.mkdir(exist_ok=True)
+    with open(out, "w") as f:
+        json.dump(results, f, indent=2)
+    print(f"\nResults saved to {out}")
 
 
 if __name__ == "__main__":
-    main()
+    run_ablation()
