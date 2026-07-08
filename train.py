@@ -39,6 +39,18 @@ def parse_args():
         default="2026 Munich Tech Arena - Datas/2026 Munich Tech Arena - Datas/landmarks",
         help="Path to directory containing CSV landmark files"
     )
+    parser.add_argument(
+        "--split",
+        type=str,
+        default="train",
+        choices=["train", "val", "test"],
+        help="The dataset partition split to train on (default: 'train')"
+    )
+    parser.add_argument(
+        "--include-val",
+        action="store_true",
+        help="Combine training and validation splits for final model training"
+    )
     
     # Model hyperparameters
     parser.add_argument(
@@ -90,20 +102,41 @@ def main():
     print("=" * 72)
     print(f"Mesh directory:      {mesh_path}")
     print(f"Landmark directory:  {landmarks_path}")
+    if args.include_val:
+        print(f"Training split:      train + val (Combined)")
+    else:
+        print(f"Training split:      {args.split}")
     print(f"SSM components:      {args.n_components}")
     print(f"KNN neighbors:       {args.k_neighbors}")
     print(f"Blend weight (α):    {args.blend_alpha}")
     print("=" * 72)
     
+    # Loud guard: Prevent training on test partition to protect evaluation validity
+    if args.split == "test" and not args.include_val:
+        print("\n" + "!" * 72)
+        print("  CRITICAL ERROR: Training on the 'test' partition is strictly forbidden!")
+        print("  To protect evaluation validity, training must never touch test subjects.")
+        print("!" * 72 + "\n")
+        sys.exit(1)
+        
     if not mesh_path.exists() or not landmarks_path.exists():
         print(f"Error: Dataset directories do not exist. Please check the paths.")
         sys.exit(1)
         
     t_start = time.time()
     
-    # 1. Load dataset using the official Dataset class
+    # 1. Load dataset using the official Dataset class with split configurations
     print("\n[1/3] Loading dataset...")
-    dataset = Dataset(mesh_dir=str(mesh_path), landmarks_dir=str(landmarks_path))
+    if args.include_val:
+        # Load train and validation splits and merge their PIDs
+        dataset_train = Dataset(mesh_dir=str(mesh_path), landmarks_dir=str(landmarks_path), split="train")
+        dataset_val = Dataset(mesh_dir=str(mesh_path), landmarks_dir=str(landmarks_path), split="val")
+        
+        dataset = Dataset(mesh_dir=str(mesh_path), landmarks_dir=str(landmarks_path))
+        dataset.subject_ids = sorted(list(set(dataset_train.subject_ids) | set(dataset_val.subject_ids)))
+    else:
+        dataset = Dataset(mesh_dir=str(mesh_path), landmarks_dir=str(landmarks_path), split=args.split)
+        
     num_subjects = len(dataset)
     print(f"  Loaded {num_subjects} subjects successfully.")
     

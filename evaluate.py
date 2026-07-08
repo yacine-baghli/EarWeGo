@@ -54,6 +54,13 @@ def parse_args():
     
     # Diagnostic configurations
     parser.add_argument(
+        "--split",
+        type=str,
+        default="val",
+        choices=["train", "val", "test"],
+        help="The dataset partition split to evaluate on (default: 'val')"
+    )
+    parser.add_argument(
         "--diagnostic",
         action="store_true",
         default=True,
@@ -90,6 +97,7 @@ def main():
     print(f"Mesh directory:      {mesh_path}")
     print(f"Landmark directory:  {landmarks_path}")
     print(f"Models directory:    {models_path}")
+    print(f"Evaluation split:    {args.split}")
     print(f"Diagnostic reports:  {args.diagnostic}")
     print("=" * 72)
     
@@ -99,9 +107,9 @@ def main():
         
     t_start = time.time()
     
-    # 1. Load dataset
+    # 1. Load dataset with split configurations
     print("\n[1/3] Loading dataset...")
-    dataset = Dataset(mesh_dir=str(mesh_path), landmarks_dir=str(landmarks_path))
+    dataset = Dataset(mesh_dir=str(mesh_path), landmarks_dir=str(landmarks_path), split=args.split)
     num_subjects = len(dataset)
     print(f"  Loaded {num_subjects} subjects.")
     
@@ -123,6 +131,43 @@ def main():
         print(f"Error instantiating extractor: {e}")
         print("Please verify that models are trained and checkpoints exist.")
         sys.exit(1)
+        
+    # --- Loud Leakage Guard ---
+    from src.splits import load_splits
+    try:
+        train_pids, val_pids, test_pids = load_splits(mesh_dir=mesh_path)
+        
+        # Guard 1: Verify split files are disjoint
+        overlap_train_val = set(train_pids) & set(val_pids)
+        overlap_train_test = set(train_pids) & set(test_pids)
+        overlap_val_test = set(val_pids) & set(test_pids)
+        if overlap_train_val or overlap_train_test or overlap_val_test:
+            print("\n" + "!" * 72)
+            print("  CRITICAL ERROR: Overlapping PIDs found between split files!")
+            print(f"  Train/Val overlap: {overlap_train_val}")
+            print(f"  Train/Test overlap: {overlap_train_test}")
+            print(f"  Val/Test overlap: {overlap_val_test}")
+            print("!" * 72 + "\n")
+            sys.exit(2)
+            
+        # Guard 2: Verify model has not trained on evaluation partition
+        if hasattr(extractor, "predictor") and extractor.predictor is not None:
+            if hasattr(extractor.predictor, "pids") and extractor.predictor.pids is not None:
+                trained_pids = set(extractor.predictor.pids)
+                eval_pids = set(dataset.subject_ids)
+                leakage = trained_pids & eval_pids
+                
+                if leakage:
+                    print("\n" + "!" * 72)
+                    print("  CRITICAL ERROR: DATA LEAKAGE DETECTED!")
+                    print(f"  The model checkpoint was trained on PIDs in the evaluation split '{args.split}'!")
+                    print(f"  Leakage count: {len(leakage)} PIDs")
+                    print(f"  Leaked PIDs: {sorted(list(leakage))[:15]}...")
+                    print("!" * 72 + "\n")
+                    sys.exit(3)
+    except Exception as e:
+        # If splits files aren't found on clean workspace or missing dataset
+        print(f"  [Leakage Guard Warning] Could not run splits validation check: {e}")
         
     # 3. Perform prediction and compute official metrics
     print("\n[3/3] Running prediction and metric computation...")

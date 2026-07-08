@@ -7,10 +7,15 @@ from pathlib import Path
 
 
 class Dataset:
-    def __init__(self, mesh_dir: str, landmarks_dir: str):
+    def __init__(self, mesh_dir: str, landmarks_dir: str, split: str = None):
         self.mesh_dir = Path(mesh_dir)
         self.landmarks_dir = Path(landmarks_dir)
-        self.subject_ids = sorted([f.stem for f in self.mesh_dir.glob("*.ply")])
+        
+        if split is not None:
+            from src.splits import get_split
+            self.subject_ids = get_split(split, mesh_dir=self.mesh_dir)
+        else:
+            self.subject_ids = sorted([f.stem for f in self.mesh_dir.glob("*.ply")])
 
     def __len__(self) -> int:
         return len(self.subject_ids)
