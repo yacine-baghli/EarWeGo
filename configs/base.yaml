@@ -40,6 +40,15 @@ model:
   augment_rotation_std: 1.0      # degrees
   augment_scale_std: 0.02        # fraction (2%)
 
+  # Post-prediction refinement stages (src/refinement.py)
+  # All default to off; toggle via version configs for A/B comparison.
+  refine:
+    clamp: false                  # Clamp Procrustes scale factor
+    scale_bounds: [0.92, 1.08]    # [lo, hi] for scale clamping
+    resample: false               # Equal arc-length contour resampling
+    selective_snap: false         # Snap only anchors (preserves contour spacing)
+    legacy_snap: true             # Naive full-surface snap (original behaviour)
+
 # ─── EarDetector (src/ear_detector.py) ───────────────────────────────────────
 detector:
   curvature_radius: 3.0          # ear_detector.py:56

@@ -249,6 +249,7 @@ def main():
             "k_neighbors": model_cfg.get("k_neighbors", 7),
             "blend_alpha": model_cfg.get("blend_alpha", 0.6),
         },
+        "refine": model_cfg.get("refine", {}),
         "training_time_s": round(elapsed, 1),
     }
     sidecar_file = weights_path / "model_info.json"

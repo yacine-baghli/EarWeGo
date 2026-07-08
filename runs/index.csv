@@ -1,2 +1,3 @@
 run_id,name,date,git_commit,split,MD,median,std,worst,P90,SR@2mm,SR@3mm,SR@5mm,Concha_MLE,config_hash,weights_path
 20260708_2020_v1-baseline_ad6020f,v1-baseline,2026-07-08,ad6020f,val,3.6794,3.6373,1.0196,6.3579,4.8528,24.2,43.5,75.9,3.0546,871341d89381,C:\Yacine\doc\Polytech\Python\Huawei_tech_arena\runs\20260708_2020_v1-baseline_ad6020f\weights
+20260708_2205_v2-refined_1cfa447,v2-refined,2026-07-08,1cfa447,val,11.4563,11.4422,1.4095,14.8877,13.1835,0.7,2.4,9.5,4.5542,a6c6adc912d8,C:\Yacine\doc\Polytech\Python\Huawei_tech_arena\runs\20260708_2205_v2-refined_1cfa447\weights

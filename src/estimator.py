@@ -154,13 +154,19 @@ class LandmarkExtractor:
         coordinates in the correct order.
         
         This method runs entirely landmark-free at test time.
+        Refinement flags are loaded from the JSON sidecar if present.
         """
         # Ensure models are loaded
         if not self._load_models(silent=False):
             raise RuntimeError("Models could not be loaded. Please run training first to generate checkpoints.")
+        
+        # Read refinement flags from the JSON sidecar (no yaml dependency)
+        refine = {}
+        if self._model_info and "refine" in self._model_info:
+            refine = self._model_info["refine"]
             
         # Predict left and right ears
-        pred_left = self.predictor.predict(mesh, side="left", ear_detector=self.detector)
-        pred_right = self.predictor.predict(mesh, side="right", ear_detector=self.detector)
+        pred_left = self.predictor.predict(mesh, side="left", ear_detector=self.detector, refine=refine)
+        pred_right = self.predictor.predict(mesh, side="right", ear_detector=self.detector, refine=refine)
         
         return pred_left, pred_right

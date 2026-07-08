@@ -196,6 +196,7 @@ class LandmarkPredictor:
         side: str = "left",
         known_landmarks: np.ndarray = None,
         ear_detector = None,
+        refine: dict = None,
     ) -> np.ndarray:
         """
         Predict landmarks for a specific ear mesh.
@@ -205,10 +206,17 @@ class LandmarkPredictor:
             side: 'left' or 'right'.
             known_landmarks: Optional starting landmarks (skips coarse alignment).
             ear_detector: Optional EarDetector object for automatic localization.
+            refine: Dict of refinement flags, e.g.
+                    {"clamp": True, "resample": True, "selective_snap": True,
+                     "scale_bounds": (0.92, 1.08)}.
+                    If None, no refinements are applied (legacy behaviour).
         
         Returns:
             (85, 3) array of predicted landmark coordinates.
         """
+        refine = refine or {}
+        from src.refinement import clamp_scale, resample_contours, selective_snap
+        
         if not self.fitted:
             raise RuntimeError("LandmarkPredictor not fitted!")
             
@@ -259,6 +267,8 @@ class LandmarkPredictor:
         aligned, transform = procrustes_align(
             initial_for_ssm, self.ssm.get_mean_shape(), allow_scale=True
         )
+        if refine.get("clamp"):
+            transform = clamp_scale(transform, *refine.get("scale_bounds", (0.92, 1.08)))
         coeff = self.ssm.project(aligned)
         
         # Step 3: SSM reconstruction with GBR residual correction
@@ -284,13 +294,20 @@ class LandmarkPredictor:
         knn_result = self._knn_predict(coeff, side)
         result = self.blend_alpha * result + (1.0 - self.blend_alpha) * knn_result
         
-        # Step 6: Snap to nearest mesh vertices using KDTree
+        # Step 6a: enforce equal-arc-length spacing (fixes the 63 non-anchor landmarks)
+        if refine.get("resample"):
+            result = resample_contours(result)
+        
+        # Step 6b: snap to surface — selective by default, legacy (all points) as fallback
         if mesh is not None:
-            try:
-                result = snap_to_mesh(result, np.array(mesh.vertices))
-            except Exception:
-                pass
-                
+            if refine.get("selective_snap"):
+                result = selective_snap(result, mesh)
+            elif refine.get("legacy_snap", True):
+                try:
+                    result = snap_to_mesh(result, np.array(mesh.vertices))
+                except Exception:
+                    pass
+        
         return result
         
     def _knn_predict(self, query_coeff: np.ndarray, side: str) -> np.ndarray:

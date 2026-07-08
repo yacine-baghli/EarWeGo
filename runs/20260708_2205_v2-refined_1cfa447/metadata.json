@@ -1,0 +1,33 @@
+{
+  "run_id": "20260708_2205_v2-refined_1cfa447",
+  "name": "v2-refined",
+  "created_at": "2026-07-08T22:08:22.344454",
+  "git_commit": "1cfa447",
+  "git_dirty": true,
+  "seed": 42,
+  "config_hash": "a6c6adc912d8",
+  "split_hashes": {
+    "train": "d84b6570193c",
+    "val": "37c321807246",
+    "test": "c34593d48bb0"
+  },
+  "data_fingerprint": {
+    "n_train_subjects": 140,
+    "train_pids_hash": "d84b6570193c",
+    "n_val_subjects": 30,
+    "n_test_subjects": 30
+  },
+  "python_version": "3.12.3 (tags/v3.12.3:f6650f9, Apr  9 2024, 14:05:25) [MSC v.1938 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "host": "yacinepc",
+  "key_lib_versions": {
+    "numpy": "2.4.4",
+    "scipy": "1.15.2",
+    "sklearn": "1.7.0",
+    "trimesh": "4.6.13"
+  },
+  "durations": {
+    "train_s": 142.7,
+    "eval_val_s": 27.3
+  }
+}
