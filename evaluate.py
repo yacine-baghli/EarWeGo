@@ -3,15 +3,16 @@
 EVALUATION PIPELINE — Huawei Tech Arena 2026 Pinna Landmark Extraction
 ============================================================================
 
-Runs the official challenge evaluation metric on the dataset.
-Optionally performs a detailed 6-dimensional diagnostic analysis and 
-saves report figures to the 'output/' directory.
+Runs the official challenge evaluation metric on a trained experiment.
+Saves all results (CSV, plots, summary) into the experiment's results/ folder.
 
 Usage:
-    python evaluate.py --mesh-dir "path/to/mesh" --landmarks-dir "path/to/landmarks"
+    python evaluate.py --experiment-dir experiments/baseline_20260708_194000
+    python evaluate.py --experiment-dir experiments/baseline_20260708_194000 --split test
 """
 
 import argparse
+import json
 import numpy as np
 from pathlib import Path
 import sys
@@ -30,6 +31,29 @@ from src.eval_plots import plot_evaluation_dashboard
 def parse_args():
     parser = argparse.ArgumentParser(description="Evaluate Pinna Landmark Extraction Performance")
     
+    # Experiment directory (preferred)
+    parser.add_argument(
+        "--experiment-dir",
+        type=str,
+        default=None,
+        help="Path to a versioned experiment directory (e.g. experiments/baseline_20260708_194000). "
+             "Models are loaded from <experiment-dir>/models/ and results saved to <experiment-dir>/results/"
+    )
+    
+    # Legacy fallback: direct model/output paths
+    parser.add_argument(
+        "--models-dir",
+        type=str,
+        default="models",
+        help="(Legacy) Directory containing trained model checkpoints"
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="output",
+        help="(Legacy) Directory to save evaluation reports and plots"
+    )
+    
     # Dataset configurations
     parser.add_argument(
         "--mesh-dir",
@@ -42,14 +66,6 @@ def parse_args():
         type=str,
         default="2026 Munich Tech Arena - Datas/2026 Munich Tech Arena - Datas/landmarks",
         help="Path to directory containing CSV landmark files"
-    )
-    
-    # Checkpoint configuration
-    parser.add_argument(
-        "--models-dir",
-        type=str,
-        default="models",
-        help="Directory containing trained model checkpoints"
     )
     
     # Diagnostic configurations
@@ -67,12 +83,6 @@ def parse_args():
         help="Run rigorous 6-dimensional evaluation and save plots"
     )
     parser.add_argument(
-        "--output-dir",
-        type=str,
-        default="output",
-        help="Directory to save evaluation reports and plots"
-    )
-    parser.add_argument(
         "--quick-test",
         type=int,
         default=0,
@@ -87,16 +97,31 @@ def main():
     
     mesh_path = Path(args.mesh_dir)
     landmarks_path = Path(args.landmarks_dir)
-    models_path = Path(args.models_dir)
-    output_path = Path(args.output_dir)
-    output_path.mkdir(exist_ok=True)
+    
+    # Resolve model and output directories based on experiment-dir or legacy paths
+    if args.experiment_dir:
+        exp_dir = Path(args.experiment_dir)
+        if not exp_dir.exists():
+            print(f"Error: Experiment directory '{exp_dir}' does not exist.")
+            sys.exit(1)
+        models_path = exp_dir / "models"
+        output_path = exp_dir / "results"
+        output_path.mkdir(exist_ok=True)
+        exp_name = exp_dir.name
+    else:
+        models_path = Path(args.models_dir)
+        output_path = Path(args.output_dir)
+        output_path.mkdir(exist_ok=True)
+        exp_name = "(legacy)"
     
     print("=" * 72)
-    print("  EVALUATION PIPELINE — PINNA LANDMARK EXTRACTION")
+    print("  EVALUATION PIPELINE -- PINNA LANDMARK EXTRACTION")
     print("=" * 72)
+    print(f"Experiment:          {exp_name}")
+    print(f"Models directory:    {models_path}")
+    print(f"Results directory:   {output_path}")
     print(f"Mesh directory:      {mesh_path}")
     print(f"Landmark directory:  {landmarks_path}")
-    print(f"Models directory:    {models_path}")
     print(f"Evaluation split:    {args.split}")
     print(f"Diagnostic reports:  {args.diagnostic}")
     print("=" * 72)
@@ -202,6 +227,8 @@ def main():
             
     # Print official overall score
     overall_mean = np.mean(subject_distances)
+    elapsed = time.time() - t_start
+    
     print("\n" + "=" * 72)
     print("  EVALUATION SUMMARY")
     print("=" * 72)
@@ -210,8 +237,29 @@ def main():
     print(f"  Median Distance:             {np.median(subject_distances):.4f} mm")
     print(f"  Max Distance:                {np.max(subject_distances):.4f} mm")
     print(f"  Min Distance:                {np.min(subject_distances):.4f} mm")
-    print(f"  Total processing time:       {time.time() - t_start:.1f}s")
+    print(f"  Total processing time:       {elapsed:.1f}s")
     print("=" * 72)
+    
+    # Save evaluation summary JSON into experiment directory
+    eval_summary = {
+        "experiment": exp_name if args.experiment_dir else "legacy",
+        "split": args.split,
+        "num_subjects": len(subject_distances),
+        "mean_distance_mm": round(float(overall_mean), 4),
+        "std_distance_mm": round(float(np.std(subject_distances)), 4),
+        "median_distance_mm": round(float(np.median(subject_distances)), 4),
+        "max_distance_mm": round(float(np.max(subject_distances)), 4),
+        "min_distance_mm": round(float(np.min(subject_distances)), 4),
+        "processing_time_s": round(elapsed, 1),
+        "per_subject": {
+            dataset.get_identifier(i): round(float(d), 4)
+            for i, d in enumerate(subject_distances)
+        },
+    }
+    summary_file = output_path / f"eval_summary_{args.split}.json"
+    with open(summary_file, "w") as f:
+        json.dump(eval_summary, f, indent=2)
+    print(f"\nEvaluation summary saved to: {summary_file}")
     
     # Produce detailed diagnostics report and plots
     if args.diagnostic and len(subject_distances) > 0:

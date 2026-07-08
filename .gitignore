@@ -14,6 +14,9 @@ venv/
 # Trained model checkpoints (large binaries)
 models/
 
+# Experiments (models + results per run)
+experiments/
+
 # Evaluation output (generated plots/reports)
 output/
 
