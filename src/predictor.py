@@ -355,11 +355,12 @@ class LandmarkPredictor:
                 and getattr(self.anchor_cascade, "fitted", False) and mesh is not None):
             verts = np.array(mesh.vertices)
             mirror = np.array([1.0, -1.0, 1.0])
+            robust = bool(refine.get("robust_solve"))
             if side == "right":
-                refined = self.anchor_cascade.refine(verts * mirror, result * mirror, self.ssm)
+                refined = self.anchor_cascade.refine(verts * mirror, result * mirror, self.ssm, robust=robust)
                 result = refined * mirror
             else:
-                result = self.anchor_cascade.refine(verts, result, self.ssm)
+                result = self.anchor_cascade.refine(verts, result, self.ssm, robust=robust)
 
         return result
         

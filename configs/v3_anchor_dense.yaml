@@ -12,3 +12,5 @@ model:
   refine:
     legacy_snap: true
     anchor_cascade: true
+    robust_solve: true   # outlier-rejecting pose/SSM solve; no-op on clean ears,
+                         # recovers ~0.2-0.7mm when a chunk of anchors mis-detect

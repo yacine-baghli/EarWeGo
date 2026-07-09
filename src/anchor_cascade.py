@@ -140,8 +140,9 @@ class AnchorCascade:
         self.fitted = True
 
     # ---- inference --------------------------------------------------------
-    def refine(self, mesh_verts, coarse_pred, ssm):
-        """Return refined full-85 prediction (mirrored-left space)."""
+    def refine(self, mesh_verts, coarse_pred, ssm, robust: bool = False):
+        """Return refined full-85 prediction (mirrored-left space).
+        robust: use outlier-rejecting pose/SSM solve (handles mis-detected anchors)."""
         if not self.fitted:
             return coarse_pred
         A = self.anchor_idx
@@ -152,4 +153,4 @@ class AnchorCascade:
             cur = cur + np.array([stage[a].predict(f[k:k+1])[0]
                                   for k, a in enumerate(A)])
         anchors_world = cur @ R + c0
-        return solve_pose_and_shape(ssm, A, anchors_world, ridge=self.ridge)
+        return solve_pose_and_shape(ssm, A, anchors_world, ridge=self.ridge, robust=robust)
