@@ -22,6 +22,15 @@ import time
 # Ensure core package is in the Python search path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+# Windows consoles default to cp1252; box-drawing chars in diagnostic reports
+# would crash. Force UTF-8 (replace on any un-encodable char) so eval always
+# finishes and registers the run in the ledger.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 from src.dataset import Dataset
 from src.estimator import LandmarkExtractor
 from src.metrics import compute_mean_landmark_distance

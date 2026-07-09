@@ -69,6 +69,7 @@ class LandmarkPredictor:
         self.all_landmarks = None
         self.pids = None
         self.regressors = None
+        self.anchor_cascade = None  # optional AnchorCascade refiner (v3)
         self.fitted = False
     
     def fit(self, all_landmarks: dict = None, train_with_regressors: bool = True):
@@ -190,6 +191,45 @@ class LandmarkPredictor:
                 regs.append(reg)
             self.regressors[i] = regs
             
+    def fit_anchor_cascade(self, subjects, ear_detector, keep_every: int = 3,
+                           n_stages: int = 2):
+        """
+        Train the AnchorCascade refiner (v3). Requires the SSM+GBR to be fitted
+        already, plus MESHES (features come from local geometry).
+
+        Args:
+            subjects: iterable of (mesh, gt_left, gt_right), all (85,3) world.
+            ear_detector: fitted EarDetector for coarse localization.
+            keep_every / n_stages: cascade hyperparameters.
+        """
+        from src.anchor_cascade import AnchorCascade
+
+        if not self.fitted:
+            raise RuntimeError("Fit the SSM+GBR (fit()) before the anchor cascade.")
+
+        mirror = np.array([1.0, -1.0, 1.0])
+        samples = []
+        print("  Generating coarse predictions for anchor-cascade training...")
+        for k, (mesh, gt_left, gt_right) in enumerate(subjects):
+            verts = np.array(mesh.vertices)
+            for side, gt in (("left", gt_left), ("right", gt_right)):
+                coarse = self.predict(mesh, side=side, ear_detector=ear_detector, refine={})
+                # pre-crop the ear cloud (margin > cascade's internal 12mm) so we
+                # store only the small local region, not the whole head mesh.
+                lo, hi = coarse.min(0) - 16.0, coarse.max(0) + 16.0
+                m = np.all((verts >= lo) & (verts <= hi), axis=1)
+                cloud = verts[m]
+                if side == "right":
+                    cloud, coarse, gt = cloud * mirror, coarse * mirror, gt * mirror
+                samples.append((cloud, coarse, gt))
+            del mesh  # release the full head mesh before the next subject
+            if (k + 1) % 25 == 0:
+                print(f"    coarse {k+1} subjects")
+
+        self.anchor_cascade = AnchorCascade(keep_every=keep_every, n_stages=n_stages)
+        self.anchor_cascade.fit(samples, self.ssm)
+        print("  AnchorCascade fitted!")
+
     def predict(
         self,
         mesh: trimesh.Trimesh = None,
@@ -298,7 +338,8 @@ class LandmarkPredictor:
         if refine.get("resample"):
             result = resample_contours(result)
         
-        # Step 6b: snap to surface — selective by default, legacy (all points) as fallback
+        # Step 6b: snap to surface — selective by default, legacy (all points) as fallback.
+        # Kept ON under anchor_cascade: the cascade was trained on snapped coarse.
         if mesh is not None:
             if refine.get("selective_snap"):
                 result = selective_snap(result, mesh)
@@ -307,7 +348,19 @@ class LandmarkPredictor:
                     result = snap_to_mesh(result, np.array(mesh.vertices))
                 except Exception:
                     pass
-        
+
+        # Step 7: anchor-cascade refinement (v3) — re-poses + re-shapes from
+        # per-anchor geometric corrections. Runs on the snapped-off coarse result.
+        if (refine.get("anchor_cascade") and self.anchor_cascade is not None
+                and getattr(self.anchor_cascade, "fitted", False) and mesh is not None):
+            verts = np.array(mesh.vertices)
+            mirror = np.array([1.0, -1.0, 1.0])
+            if side == "right":
+                refined = self.anchor_cascade.refine(verts * mirror, result * mirror, self.ssm)
+                result = refined * mirror
+            else:
+                result = self.anchor_cascade.refine(verts, result, self.ssm)
+
         return result
         
     def _knn_predict(self, query_coeff: np.ndarray, side: str) -> np.ndarray:
@@ -349,6 +402,7 @@ class LandmarkPredictor:
                 "all_landmarks": self.all_landmarks,
                 "pids": self.pids,
                 "regressors": self.regressors,
+                "anchor_cascade": self.anchor_cascade,
             }, f)
         print(f"LandmarkPredictor saved to {path}")
         

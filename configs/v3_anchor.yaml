@@ -1,0 +1,16 @@
+# V3 Anchor-Cascade — geometric per-anchor refinement on top of the v1 coarse.
+# Predicts ~32 anchor landmarks from local mesh geometry (cascaded RandomForest
+# regression), then solves pose + SSM shape from them and reconstructs all 85.
+# Validated on val: 3.68 -> 2.42mm (-34%). Oracle ceiling ~1.84mm.
+_base: base.yaml
+name: v3_anchor
+description: "v1 coarse + cascaded anchor regression + pose/SSM solve (keep_every=3, 2 stages)"
+
+model:
+  anchor_cascade:
+    enabled: true
+    keep_every: 3        # ~32 anchors (endpoints + every 3rd per contour)
+    n_stages: 2          # cascade converges by stage 2
+  refine:
+    legacy_snap: true    # coarse is snapped (cascade trained on snapped coarse)
+    anchor_cascade: true # turn the refiner ON at inference (read from sidecar)

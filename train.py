@@ -218,6 +218,19 @@ def main():
         blend_alpha=model_cfg.get("blend_alpha", 0.6),
     )
     predictor.fit(all_landmarks, train_with_regressors=model_cfg.get("use_regressors", True))
+
+    # 3b. Optional: fit the AnchorCascade refiner (v3). Needs meshes.
+    cascade_cfg = model_cfg.get("anchor_cascade", {})
+    if cascade_cfg.get("enabled"):
+        print("\n[3b/3] Fitting AnchorCascade refiner (geometric anchor regression)...")
+        # stream meshes one at a time — do NOT materialize all 140 (MemoryError)
+        subjects = (dataset[idx] for idx in range(num_subjects))  # (mesh, l, r)
+        predictor.fit_anchor_cascade(
+            subjects, detector,
+            keep_every=cascade_cfg.get("keep_every", 3),
+            n_stages=cascade_cfg.get("n_stages", 2),
+        )
+
     predictor_file = weights_path / "landmark_predictor.pkl"
     predictor.save(predictor_file)
     
