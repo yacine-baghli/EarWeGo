@@ -1,0 +1,15 @@
+# V4 Dense — detect ALL 85 landmarks (dense cascade) + coarse-to-fine + SSM-project.
+# Best classical model: beats anchor-solve by using all points, not just anchors.
+# Validated on val: 3.68 -> 1.85mm. (Deep model targets <1.29; this is the classical best.)
+_base: base.yaml
+name: v4_dense
+description: "v1 coarse + dense all-85 cascade, 3-round coarse-to-fine + SSM-project"
+
+model:
+  dense_cascade:
+    enabled: true
+    n_rounds: 2          # 2 rounds keeps the pickle shippable (~80MB); 3 was 335MB
+    n_stages: 2
+  refine:
+    legacy_snap: true      # coarse is snapped (cascade trained on snapped coarse)
+    dense_cascade: true    # turn the dense refiner ON at inference (read from sidecar)

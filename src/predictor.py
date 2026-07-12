@@ -70,6 +70,7 @@ class LandmarkPredictor:
         self.pids = None
         self.regressors = None
         self.anchor_cascade = None  # optional AnchorCascade refiner (v3)
+        self.dense_cascade = None   # optional DenseCascade refiner (v4)
         self.fitted = False
     
     def fit(self, all_landmarks: dict = None, train_with_regressors: bool = True):
@@ -230,6 +231,36 @@ class LandmarkPredictor:
         self.anchor_cascade.fit(samples, self.ssm)
         print("  AnchorCascade fitted!")
 
+    def fit_dense_cascade(self, subjects, ear_detector, n_rounds: int = 3,
+                          n_stages: int = 2):
+        """Train the DenseCascade refiner (v4): all-85 coarse-to-fine + SSM-project.
+        Needs meshes. subjects: iterable of (mesh, gt_left, gt_right)."""
+        from src.dense_cascade import DenseCascade
+
+        if not self.fitted:
+            raise RuntimeError("Fit the SSM+GBR (fit()) before the dense cascade.")
+
+        mirror = np.array([1.0, -1.0, 1.0])
+        samples = []
+        print("  Generating coarse predictions for dense-cascade training...")
+        for k, (mesh, gt_left, gt_right) in enumerate(subjects):
+            verts = np.array(mesh.vertices)
+            for side, gt in (("left", gt_left), ("right", gt_right)):
+                coarse = self.predict(mesh, side=side, ear_detector=ear_detector, refine={})
+                lo, hi = coarse.min(0) - 22.0, coarse.max(0) + 22.0
+                m = np.all((verts >= lo) & (verts <= hi), axis=1)
+                cloud = verts[m]
+                if side == "right":
+                    cloud, coarse, gt = cloud * mirror, coarse * mirror, gt * mirror
+                samples.append((cloud, coarse, gt))
+            del mesh
+            if (k + 1) % 25 == 0:
+                print(f"    coarse {k+1} subjects")
+
+        self.dense_cascade = DenseCascade(n_rounds=n_rounds, n_stages=n_stages)
+        self.dense_cascade.fit(samples)
+        print("  DenseCascade fitted!")
+
     def predict(
         self,
         mesh: trimesh.Trimesh = None,
@@ -362,6 +393,16 @@ class LandmarkPredictor:
             else:
                 result = self.anchor_cascade.refine(verts, result, self.ssm, robust=robust)
 
+        # Step 8: dense-cascade refinement (v4) — all-85 coarse-to-fine + SSM-project.
+        if (refine.get("dense_cascade") and self.dense_cascade is not None
+                and getattr(self.dense_cascade, "fitted", False) and mesh is not None):
+            verts = np.array(mesh.vertices)
+            mirror = np.array([1.0, -1.0, 1.0])
+            if side == "right":
+                result = self.dense_cascade.refine(verts * mirror, result * mirror) * mirror
+            else:
+                result = self.dense_cascade.refine(verts, result)
+
         return result
         
     def _knn_predict(self, query_coeff: np.ndarray, side: str) -> np.ndarray:
@@ -404,6 +445,7 @@ class LandmarkPredictor:
                 "pids": self.pids,
                 "regressors": self.regressors,
                 "anchor_cascade": self.anchor_cascade,
+                "dense_cascade": self.dense_cascade,
             }, f)
         print(f"LandmarkPredictor saved to {path}")
         

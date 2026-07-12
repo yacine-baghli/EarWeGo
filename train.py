@@ -231,6 +231,17 @@ def main():
             n_stages=cascade_cfg.get("n_stages", 2),
         )
 
+    # 3c. Optional: fit the DenseCascade refiner (v4). Needs meshes.
+    dense_cfg = model_cfg.get("dense_cascade", {})
+    if dense_cfg.get("enabled"):
+        print("\n[3c/3] Fitting DenseCascade refiner (all-85 coarse-to-fine + SSM-project)...")
+        subjects = (dataset[idx] for idx in range(num_subjects))  # stream meshes
+        predictor.fit_dense_cascade(
+            subjects, detector,
+            n_rounds=dense_cfg.get("n_rounds", 3),
+            n_stages=dense_cfg.get("n_stages", 2),
+        )
+
     predictor_file = weights_path / "landmark_predictor.pkl"
     predictor.save(predictor_file)
     
