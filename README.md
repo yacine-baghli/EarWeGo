@@ -4,9 +4,22 @@
 
 This repository contains a professional implementation of a hybrid 3D geometry pipeline to automatically extract **85 pinna (outer ear) landmarks** from human head scans. The solution runs **entirely landmark-free at test time**, utilizing surface curvature, shape priors, and statistical regression to achieve high precision and robustness.
 
+## Best Validated Version
+
+The best recorded classical pipeline is **Dense V4**, with a validation mean
+landmark error of **1.8738 mm** across 30 subjects.
+
+- [Browse the Dense V4 source snapshot](versions/dense_v4_1.8738mm/)
+- [View aggregate validation metrics](versions/dense_v4_1.8738mm/validation_metrics.json)
+- Source commit: [`21bdc53`](https://github.com/yacine-baghli/EarWeGo/commit/21bdc53bb21ffbb8dcc0026108efcb014a025926)
+
+The snapshot contains only relevant source code, configuration, dependencies,
+and aggregate metrics. Challenge data, participant split lists, trained
+weights, host metadata, and per-subject results are not published.
+
 ## System Architecture
 
-The pipeline processes raw 3D head meshes using five main stages:
+The pipeline processes raw 3D head meshes using six main stages:
 
 ```
 3D Head Scan (PLY)
@@ -60,6 +73,8 @@ Huawei_tech_arena/
 │   ├── visualize.py            # Diagnostic and 3D visualization tools
 │   ├── evaluation.py           # 6-Dimensional Rigorous Evaluation suite
 │   └── eval_plots.py           # Diagnostic dashboard plotting code
+├── versions/
+│   └── dense_v4_1.8738mm/      # Source-only snapshot of the best validated version
 ├── requirements.txt            # Package dependencies
 ├── train.py                    # Script to train and save checkpoints
 ├── evaluate.py                 # Script to evaluate model performance
