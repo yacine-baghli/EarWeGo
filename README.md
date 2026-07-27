@@ -9,6 +9,17 @@ This repository contains a professional implementation of a hybrid 3D geometry p
 The best recorded classical pipeline is **Dense V4**, with a validation mean
 landmark error of **1.8738 mm** across 30 subjects.
 
+| Validation metric | Result |
+| --- | ---: |
+| Mean landmark error | **1.8738 mm** |
+| Median landmark error | **1.7177 mm** |
+| Standard deviation | 0.5310 mm |
+| 90th percentile | 2.5800 mm |
+| 95th percentile | 2.7981 mm |
+| Success rate at 2 mm | 65.5% |
+| Success rate at 3 mm | 84.1% |
+| Success rate at 5 mm | 95.9% |
+
 - [Browse the Dense V4 source snapshot](versions/dense_v4_1.8738mm/)
 - [View aggregate validation metrics](versions/dense_v4_1.8738mm/validation_metrics.json)
 - Source commit: [`21bdc53`](https://github.com/yacine-baghli/EarWeGo/commit/21bdc53bb21ffbb8dcc0026108efcb014a025926)
