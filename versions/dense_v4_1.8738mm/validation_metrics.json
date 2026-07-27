@@ -1,0 +1,13 @@
+{
+  "source_commit": "21bdc53bb21ffbb8dcc0026108efcb014a025926",
+  "split": "validation",
+  "num_subjects": 30,
+  "mean_distance_mm": 1.8738,
+  "std_distance_mm": 0.5310,
+  "median_distance_mm": 1.7177,
+  "p90_mm": 2.5800,
+  "p95_mm": 2.7981,
+  "success_rate_at_2mm_percent": 65.5,
+  "success_rate_at_3mm_percent": 84.1,
+  "success_rate_at_5mm_percent": 95.9
+}
