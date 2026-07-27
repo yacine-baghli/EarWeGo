@@ -52,6 +52,7 @@ The pipeline processes raw 3D head meshes using six main stages:
 4. **Residual Correction**: Uses 255 separate Gradient Boosting Regressors (GBR) to predict coordinate-wise residuals between the regularized SSM reconstruction and the true landmark geometry.
 5. **K-Nearest Neighbors (KNN) Blending**: Computes similarity weights in the shape coefficient space and blends the predictions with the nearest neighborhood of local training shapes.
 6. **Surface Snapping**: Projects predicted landmark points to the nearest coordinate on the target mesh surface.
+<img width="2491" height="1922" alt="image" src="https://github.com/user-attachments/assets/0aa5f6ee-3f07-4031-a758-efff87c1c904" />
 
 ---
 
