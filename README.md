@@ -4,29 +4,53 @@
 
 This repository contains a professional implementation of a hybrid 3D geometry pipeline to automatically extract **85 pinna (outer ear) landmarks** from human head scans. The solution runs **entirely landmark-free at test time**, utilizing surface curvature, shape priors, and statistical regression to achieve high precision and robustness.
 
-## Best Validated Version
+## Best Validated Version — Deep Contour Ensemble (1.329 mm)
 
-The best recorded classical pipeline is **Dense V4**, with a validation mean
-landmark error of **1.8738 mm** across 30 subjects.
+The best model is a **deep point-cloud network that refines the classical estimate**,
+reaching a validation mean landmark error of **1.329 mm** (60 ears / 30 subjects) —
+a **28 % improvement over the classical Dense-V4 pipeline** and a **2× improvement**
+over the previously committed model on the one-shot test set (2.65 mm).
 
-| Validation metric | Result |
-| --- | ---: |
-| Mean landmark error | **1.8738 mm** |
-| Median landmark error | **1.7177 mm** |
-| Standard deviation | 0.5310 mm |
-| 90th percentile | 2.5800 mm |
-| 95th percentile | 2.7981 mm |
-| Success rate at 2 mm | 65.5% |
-| Success rate at 3 mm | 84.1% |
-| Success rate at 5 mm | 95.9% |
+![deep results](deep_model/results/deep_results.png)
+
+| Validation metric (60 ears) | Deep ensemble | Classical Dense-V4 |
+| --- | ---: | ---: |
+| Mean landmark error | **1.329 mm** | 1.874 mm |
+| Median landmark error | 1.143 mm | 1.718 mm |
+| RMSE | 1.586 mm | — |
+| 95 % CI for the mean | **[1.242, 1.414] mm** | — |
+| Worst-ear mean | 2.245 mm | 6.36 mm |
+| Success rate @ 2 mm | **81.9 %** | 65.5 % |
+| Success rate @ 3 mm | **93.5 %** | 84.1 % |
+| Success rate @ 5 mm | **98.9 %** | 95.9 % |
+| HRTF-critical SR @ 2 mm | 88.9 % | — |
+
+The competition-winning reference (1.29 mm) sits **inside the 95 % confidence
+interval** — statistically indistinguishable at this sample size. Full architecture,
+the key finding (≈60 % of the error is *tangential* — landmark sliding *along*
+contours — which a per-region **contour-structured refinement head** corrects), the
+torch-free NumPy inference (parity-verified to 5e-6), and reproduction instructions
+are in **[`deep_model/README.md`](deep_model/README.md)**.
+
+```bash
+python -m deep_model.evaluate_deep   # reproduce the metrics + figure (no PyTorch, no raw data)
+```
+
+<details>
+<summary><b>Classical baseline — Dense V4 (1.8738 mm)</b></summary>
+
+The best classical pipeline is **Dense V4**, validation MLE **1.8738 mm** (30 subjects):
+median 1.7177 mm, SR@2/3/5 mm = 65.5 / 84.1 / 95.9 %. It is the coarse initialiser
+for the deep model above.
 
 - [Browse the Dense V4 source snapshot](versions/dense_v4_1.8738mm/)
 - [View aggregate validation metrics](versions/dense_v4_1.8738mm/validation_metrics.json)
 - Source commit: [`21bdc53`](https://github.com/yacine-baghli/EarWeGo/commit/21bdc53bb21ffbb8dcc0026108efcb014a025926)
+</details>
 
-The snapshot contains only relevant source code, configuration, dependencies,
-and aggregate metrics. Challenge data, participant split lists, trained
-weights, host metadata, and per-subject results are not published.
+The published artifacts contain source code, model weights (NumPy), configuration,
+and aggregate metrics only. Challenge data, participant split lists, host metadata,
+and per-subject results are **not** published.
 
 ## System Architecture
 

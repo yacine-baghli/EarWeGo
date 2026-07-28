@@ -1,0 +1,23 @@
+{
+  "n_ears": 60,
+  "MLE_mm": 1.329,
+  "median_mm": 1.143,
+  "RMSE_mm": 1.586,
+  "worst_ear_mm": 2.245,
+  "best_ear_mm": 0.71,
+  "CI95_mm": [
+    1.242,
+    1.414
+  ],
+  "SR@2mm": 81.9,
+  "SR@3mm": 93.5,
+  "SR@5mm": 98.9,
+  "HRTF_SR@2mm": 88.9,
+  "HRTF_critical_MLE_mm": 1.092,
+  "per_region_MLE_mm": {
+    "Helix": 1.35,
+    "Antihelix/Concha": 1.081,
+    "Outer boundary": 1.678,
+    "Cross-section": 1.325
+  }
+}
