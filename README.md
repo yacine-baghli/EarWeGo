@@ -36,6 +36,15 @@ are in **[`deep_model/README.md`](deep_model/README.md)**.
 python -m deep_model.evaluate_deep   # reproduce the metrics + figure (no PyTorch, no raw data)
 ```
 
+**1.329 mm is the measured floor for this dataset.** Two adversarial investigations
+plus dozens of grounded measurements ruled out every modeling lever (more seeds,
+synthetic data, curvature features, richer priors, cascade, relational/global heads,
+bilateral symmetry, surface-snap) — all wash-or-worse — because the mean is limited by
+**ground-truth annotation ambiguity** on ~5 rim landmarks plus a **280-ear data
+ceiling**. Genuine improvement needs new *information* (external 3D-ear data for
+backbone pretraining, or re-labeling the ambiguous landmarks), not new architecture —
+see [`deep_model/README.md`](deep_model/README.md#why-1329-mm-is-the-floor-exhaustively-measured).
+
 <details>
 <summary><b>Classical baseline — Dense V4 (1.8738 mm)</b></summary>
 

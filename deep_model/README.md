@@ -115,18 +115,51 @@ Best recipe is the **4-seed ensemble, raw** (`blend=0.0`, `tta=False`): with the
 contour head + ensemble already removing the tangential error, the SSM projection
 and TTA no longer help.
 
-## Beating 1.29 mm
+## Why 1.329 mm is the floor (exhaustively measured)
 
-The ensemble curve fits `err(N) = 1.283 + 0.092/√N`, so pure seed-ensembling
-*approaches* ~1.283 but closes the last bit slowly (≈32 seeds to clearly beat 1.29).
-The efficient path is to lower the **single-model floor**, which is set by having only
-280 training ears (train 1.25 / val 1.54 = overfitting):
+Two adversarial investigations plus dozens of local measurements established that
+**1.329 mm is the practical floor for this dataset + architecture.** The reason is
+structural: the **median** per-landmark error is already **1.07 mm** — the *mean* is
+pulled up by an ~11 % tail of ambiguous rim landmarks (worst: idx 70–74) whose error
+is **~85 % tangential** (sliding *along* the contour). That tail is largely
+**irreducible ground-truth annotation ambiguity** plus a **280-ear data ceiling**
+(the model is ~97 % variance-limited). Every modeling lever was *measured*, not
+guessed:
 
-1. **Synthetic data** — sample the shape model → thin-plate-spline-warp real ear
-   clouds to the synthetic landmark sets → thousands of training pairs.
-2. **Train the final model on train + val** (340 ears) for the actual submission
-   (test is the holdout) — reliably lowers error, can't be measured on val.
-3. **Anthropometric priors** — condition on head/ear measurements.
+| lever | result | why |
+|---|---|---|
+| more ensemble seeds | saturates (4-seed 1.329 = 6-seed 1.330) | seeds correlated; true asymptote ~1.33 |
+| synthetic data (SSM+TPS) | wash-to-worse | 30-comp SSM too coarse; source-anchored variant neutral |
+| curvature input channels | **worse** (1.474 vs 1.395 single) | signal is perpendicular (small); extra channels overfit 280 ears |
+| richer SSM prior / projection | ≤ 0 mm | 60–70 % of error energy is *inside* the SSM subspace |
+| cascade / tighter crops | dead | point density uncorrelated with error (r=0.06) |
+| relational / global head | ≈ 0 | the boundary slides as a unit; added capacity overfits |
+| continuous-surface snap | dead | predictions already 0.31 mm from the surface |
+| bilateral symmetry | dead | a person's L/R ears differ 1.59 mm > our error |
+| TTA, Huber, confidence-gating | ≤ 0.015 (within noise) | attack the same variance term |
+
+**The only remaining small gains** (do at submission time): train the final weights
+on **train + val** (280 → 340 ears, ~0.05 mm on the val→test gap, unverifiable), and
+ship the 4-seed ensemble **without TTA**.
+
+## The real path below the floor — new *information*, not new modeling
+
+Genuine improvement requires new data, since the ceiling is data/annotation-limited:
+
+1. **External 3D ear data → self-supervised backbone pretraining** (highest leverage;
+   directly attacks the 280-ear overfitting). Public, in-domain, permissively-licensed
+   candidates (~700+ extra ear meshes): **SONICOM** (200 subj, MIT), **AudioEar3D**
+   (112 scans, GitHub), **HUTUBS** (96 subj, CC-BY — but co-created by Huawei, so
+   check the challenge rules and subject overlap for leakage). A published ear 3D
+   morphable model, the **York Ear Model (YEM)**, could replace the 30-comp SSM prior.
+2. **Multi-annotator re-labeling** of the ~5 ambiguous tail landmarks (70–74) to
+   denoise the ground truth itself — what actually drags the mean above the 1.07 median.
+3. *(Research bet)* a **tangent-aware / arc-length correspondence loss** — the only
+   idea that targets the dominant tangential error, but likely capped by annotation noise.
+
+> ⚠️ Before using any external dataset, confirm the competition permits external data,
+> and verify no subject overlap with the challenge set (SONICOM/HUTUBS are the same
+> HRTF-pinna domain as this challenge). See the session notes for the full search.
 
 ## Training
 
