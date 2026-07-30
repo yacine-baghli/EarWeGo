@@ -4,11 +4,11 @@
 
 This repository contains a professional implementation of a hybrid 3D geometry pipeline to automatically extract **85 pinna (outer ear) landmarks** from human head scans. The solution runs **entirely landmark-free at test time**, utilizing surface curvature, shape priors, and statistical regression to achieve high precision and robustness.
 
-## Best Validated Version — Deep Contour Ensemble + Dense SSM (1.294 mm)
+## Best Validated Version — Deep Contour Ensemble + Dense SSM + TTA (1.273 mm)
 
 The best model is a **deep point-cloud network that refines the classical estimate**,
-reaching a validation mean landmark error of **1.294 mm** (60 ears / 30 subjects) —
-a **31 % improvement over the classical Dense-V4 pipeline** and a **2× improvement**
+reaching a validation mean landmark error of **1.273 mm** (60 ears / 30 subjects) —
+a **32 % improvement over the classical Dense-V4 pipeline** and a **2× improvement**
 over the previously committed model on the one-shot test set (2.65 mm).
 
 **Target:** the organizers specify **< 0.5 mm** ("good") and **< 0.2 mm** ("very good"),
@@ -21,15 +21,15 @@ target is reachable in principle — the measured obstacle and the concrete plan
 
 | Validation metric (60 ears) | Deep ensemble | Classical Dense-V4 |
 | --- | ---: | ---: |
-| Mean landmark error | **1.294 mm** | 1.874 mm |
-| Median landmark error | 1.120 mm | 1.718 mm |
-| RMSE | 1.560 mm | — |
-| 95 % CI for the mean | [1.206, 1.379] mm | — |
-| Worst-ear mean | 2.216 mm | 6.36 mm |
-| Success rate @ 2 mm | **82.2 %** | 65.5 % |
-| Success rate @ 3 mm | **93.7 %** | 84.1 % |
+| Mean landmark error | **1.273 mm** | 1.874 mm |
+| Median landmark error | 1.079 mm | 1.718 mm |
+| RMSE | 1.538 mm | — |
+| 95 % CI for the mean | [1.179, 1.359] mm | — |
+| Worst-ear mean | 2.227 mm | 6.36 mm |
+| Success rate @ 2 mm | **82.8 %** | 65.5 % |
+| Success rate @ 3 mm | **94.1 %** | 84.1 % |
 | Success rate @ 5 mm | **98.9 %** | 95.9 % |
-| HRTF-critical SR @ 2 mm | 88.7 % | — |
+| HRTF-critical SR @ 2 mm | 89.2 % | — |
 
 ```bash
 python -m deep_model.evaluate_deep   # reproduce the metrics + figure (no PyTorch, no raw data)
@@ -37,7 +37,7 @@ python -m deep_model.evaluate_deep   # reproduce the metrics + figure (no PyTorc
 
 ---
 
-## Architecture of the best model (1.294 mm)
+## Architecture of the best model (1.273 mm)
 
 The deep model does not predict landmarks from scratch: it **refines** the classical
 pipeline's coarse estimate (~3.68 mm, [see below](#system-architecture)). Every stage
@@ -52,6 +52,8 @@ raw head mesh (PLY)  ──►  classical pipeline  ──►  coarse 85 landmar
                                rotation-align to the SSM mean shape, centre on the
                                coarse centroid, keep true mm scale, sample 2048 pts.
                                Right ears are mirrored into a common left frame.
+                               ┌─ stages [0]–[4] are repeated over 4 INDEPENDENT
+                               │  surface samples and averaged (see [4b]).
    ▼
 [1] DGCNN BACKBONE             3 × EdgeConv on a static k-NN graph (k=20) over the
                                point cloud → 64/128/128 features, concatenated (320)
@@ -79,6 +81,12 @@ raw head mesh (PLY)  ──►  classical pipeline  ──►  coarse 85 landmar
 [4] 4-SEED ENSEMBLE            average the raw predictions of 4 independently trained
                                seeds (measured to saturate at 4: 6 seeds = 1.330).
    ▼
+[4b] FRESH-SAMPLE TTA          average over 4 INDEPENDENT surface samples of the same
+                               ear. WHICH points are sampled moves the prediction by
+                               ~0.67 mm, and nothing else averages that away (rotation
+                               TTA cannot — it reuses the same points). Also removes a
+                               ~0.015 mm single-sample lottery from the score itself.
+   ▼
 [5] SURFACE PROJECTION         exact point-to-triangle snap onto the mesh (pure NumPy).
    ▼
 [6] DENSE-SSM HYBRID FIT       a dense-vertex ear shape model is fitted to the target
@@ -96,8 +104,15 @@ raw head mesh (PLY)  ──►  classical pipeline  ──►  coarse 85 landmar
 | [1]+[2] DGCNN + iterative offset→snap head | 1.50 mm | −2.18 |
 | [3] + contour-structured refinement | 1.375 mm | −0.13 |
 | [4] + 4-seed ensemble | 1.329 mm | −0.046 |
-| [5] + exact surface projection | 1.309 mm | −0.020 |
-| [6] + dense-SSM hybrid blend | **1.294 mm** | −0.015 |
+| [4b] + fresh-sample TTA (4 samples) | 1.294 mm | −0.055\* |
+| [5] + exact surface projection | 1.277 mm | −0.017 |
+| [6] + dense-SSM hybrid blend | **1.273 mm** | −0.004 |
+
+\* measured on an equal footing (1 vs 4 freshly-drawn samples: 1.348 → 1.294 mm,
+**80 % of ears improved, p = 1e-5**, subject-bootstrap CI [+0.031, +0.077]). The −0.055
+exceeds the apparent 1.329 → 1.294 step because the previously stored single sample
+happened to be a favourable draw (+0.015 mm better than an average one); averaging over
+samples removes that lottery, so the new figure is both better **and** more stable.
 
 ### Why the contour head is the key architectural idea
 
@@ -188,7 +203,7 @@ and per-subject results are **not** published.
 > This is the **classical** pipeline. On its own it reaches 1.874 mm (Dense-V4); in the
 > current best model it serves as the **coarse initialiser** (~3.68 mm for the v1
 > configuration used to train the deep model) that the
-> [deep model above](#architecture-of-the-best-model-1294-mm) refines to 1.294 mm.
+> [deep model above](#architecture-of-the-best-model-1273-mm) refines to 1.294 mm.
 > It runs entirely landmark-free at test time.
 
 The pipeline processes raw 3D head meshes using six main stages:

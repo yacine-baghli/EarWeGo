@@ -29,7 +29,7 @@ def _frame(mesh_verts, coarse_world, mean_shape, npts=2048, margin=14.0, seed=0)
 
 
 def deep_refine(mesh_verts, coarse_world, ensemble, mean_shape, side="left", npts=2048,
-                mesh_faces=None, dense_ssm=None, ssm_alpha=0.3):
+                mesh_faces=None, dense_ssm=None, ssm_alpha=0.3, n_samples=4):
     """Return deep-refined (85,3) landmarks in world frame. `side` handles mirroring.
 
     If `mesh_faces` is given, the predictions are projected onto the mesh SURFACE
@@ -41,9 +41,17 @@ def deep_refine(mesh_verts, coarse_world, ensemble, mean_shape, side="left", npt
     if side == "right":
         mv = mesh_verts * MIRROR
         cw = coarse_world * MIRROR
-    cloud, coarse_canon, R, c0 = _frame(mv, cw, mean_shape, npts)
-    pred_canon = ensemble.predict(cloud, coarse_canon)
-    world = pred_canon @ R + c0                       # mirrored frame if side==right
+    # Average over n_samples INDEPENDENT surface samples of the same ear. Which points
+    # get sampled moves the prediction by ~0.67mm, and that variance is otherwise
+    # unaveraged: measured 1.348 -> 1.294mm going from 1 to 4 samples (80% of ears
+    # improved, p=1e-5). It also removes a ~0.015mm single-sample lottery from the
+    # reported score. Saturates at 4.
+    acc = None
+    for s in range(max(1, n_samples)):
+        cloud, coarse_canon, R, c0 = _frame(mv, cw, mean_shape, npts, seed=s)
+        p = ensemble.predict(cloud, coarse_canon) @ R + c0
+        acc = p if acc is None else acc + p
+    world = acc / max(1, n_samples)                   # mirrored frame if side==right
     if mesh_faces is not None:
         F = np.asarray(mesh_faces)
         world = project_to_surface(world, mv, F)

@@ -1,7 +1,7 @@
 # Deep Contour-Ensemble Landmark Model
 
-Best validated model in this repository: **1.294 mm** mean landmark error on the
-held-out validation split (60 ears / 30 subjects) — a **31 % improvement over the
+Best validated model in this repository: **1.273 mm** mean landmark error on the
+held-out validation split (60 ears / 30 subjects) — a **32 % improvement over the
 classical Dense-V4 pipeline** (1.85 mm val) and a **2× improvement over the
 previously committed model** on the one-shot test set (2.65 mm).
 
@@ -17,17 +17,17 @@ previously committed model** on the one-shot test set (2.65 mm).
 
 | Metric (validation, 60 ears) | Result |
 | --- | ---: |
-| Mean landmark error (MLE) | **1.294 mm** |
-| Median landmark error | 1.120 mm |
-| RMSE | 1.560 mm |
-| 95 % CI for the mean | [1.206, 1.379] mm |
-| Worst-ear mean | 2.216 mm *(classical: 6.36)* |
-| Best-ear mean | 0.642 mm |
-| Success rate @ 2 mm | 82.2 % |
-| Success rate @ 3 mm | 93.7 % |
+| Mean landmark error (MLE) | **1.273 mm** |
+| Median landmark error | 1.079 mm |
+| RMSE | 1.538 mm |
+| 95 % CI for the mean | [1.179, 1.359] mm |
+| Worst-ear mean | 2.227 mm *(classical: 6.36)* |
+| Best-ear mean | 0.575 mm |
+| Success rate @ 2 mm | 82.8 % |
+| Success rate @ 3 mm | 94.1 % |
 | Success rate @ 5 mm | 98.9 % |
-| HRTF-critical SR @ 2 mm | 88.7 % |
-| HRTF-critical MLE | 1.052 mm |
+| HRTF-critical SR @ 2 mm | 89.2 % |
+| HRTF-critical MLE | 1.022 mm |
 
 ## Architecture
 
@@ -191,6 +191,33 @@ A **naive** non-rigid ICP transport (no shape model) was also tried and is much 
 (2.44 vs 1.92 mm on the same ears) — the template slides freely along the smooth
 surface. Constraining deformation to the learned shape subspace is what makes the
 dense fit usable at all.
+
+## Where the remaining error actually is: correspondence, not geometry
+
+The single most informative measurement we have. On out-of-fold predictions (340 ears)
+we asked how much of the error is *geometric* (wrong place on the surface) versus
+*parametrisation* (right curve, wrong position **along** it — which the ordered metric
+still punishes). Oracles that use the ground truth only to reparametrise our **own**
+predicted curve:
+
+| oracle (OOF, 340 ears) | MLE | interpretation |
+| --- | ---: | --- |
+| baseline | 1.403 mm | — |
+| **1 scalar arc-length shift per contour per ear** | 1.134 mm | 4 numbers/ear recover **19 %** |
+| **affine warp of the parameter per contour** (offset + stretch) | 0.911 mm | 8 numbers/ear recover **35 %** |
+| **perfect per-point parametrisation** (slide each point freely along the GT curve) | **0.684 mm** | **51 % of our error is correspondence, not geometry** |
+
+So our geometry is already good enough for ~0.68 mm: the model finds the right
+anatomical curve but not the annotation convention's position along it. The correction is
+strikingly low-dimensional — 8 numbers per ear buy 0.49 mm.
+
+**But it is not predictable from the prediction alone.** Regressing those oracle
+parameters from the predicted landmark configuration (ridge, subject-grouped 5-fold CV)
+recovers **−3 %**, i.e. nothing; oracle-vs-predicted correlations are only 0.18–0.30.
+That is consistent: if a whole contour is phase-shifted, the shift is invisible *within*
+the prediction — resolving it requires reading the **surface**. Which is exactly why the
+next step is a model that predicts the curve, its endpoints and a monotone
+parametrisation *from surface features*, rather than another local XYZ refiner.
 
 ## The path toward the 0.5 mm target
 

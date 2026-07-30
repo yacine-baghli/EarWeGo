@@ -18,7 +18,7 @@ HERE = Path(__file__).resolve().parent
 PROGRESSION = [("classical (test)", 2.65), ("classical (val)", 1.85),
                ("deep DGCNN", 1.50), ("+contour head", 1.375),
                ("+4-seed ensemble", 1.329), ("+surface proj", 1.309),
-               ("+dense SSM", 1.294)]
+               ("+dense SSM", 1.294), ("+4-sample TTA", 1.2725)]
 SCALING = [(1, 1.375), (2, 1.350), (4, 1.329), (6, 1.330)]
 ASYMPTOTE = 1.33          # MEASURED ensemble saturation (4-seed 1.329 == 6-seed 1.330)
 TARGET = 0.5              # organizers' target: <0.5mm "good", <0.2mm "very good"
@@ -76,7 +76,7 @@ def make_figure(dists):
 
     a = ax[0, 0]
     vals = [v for _, v in PROGRESSION]
-    cols = [MUTED, MUTED, "#b9c0c7", "#9ec6e0", "#5599c6", BLUE]
+    cols = [MUTED, MUTED, "#b9c0c7", "#aecfe6", "#7fb3d5", "#3f86bd", BLUE]
     a.bar(range(len(vals)), vals, color=cols[:len(vals)], width=0.66, zorder=3)
     a.axhline(TARGET, color="#D55E00", lw=1.4, ls=(0, (4, 3)), zorder=2)
     a.text(len(vals) - 0.5, TARGET + 0.06, "0.5mm target", color="#D55E00",

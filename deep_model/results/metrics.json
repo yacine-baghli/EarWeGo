@@ -1,23 +1,23 @@
 {
   "n_ears": 60,
-  "MLE_mm": 1.294,
-  "median_mm": 1.12,
-  "RMSE_mm": 1.56,
-  "worst_ear_mm": 2.216,
-  "best_ear_mm": 0.642,
+  "MLE_mm": 1.273,
+  "median_mm": 1.079,
+  "RMSE_mm": 1.538,
+  "worst_ear_mm": 2.227,
+  "best_ear_mm": 0.575,
   "CI95_mm": [
-    1.206,
-    1.379
+    1.179,
+    1.359
   ],
-  "SR@2mm": 82.2,
-  "SR@3mm": 93.7,
+  "SR@2mm": 82.8,
+  "SR@3mm": 94.1,
   "SR@5mm": 98.9,
-  "HRTF_SR@2mm": 88.7,
-  "HRTF_critical_MLE_mm": 1.052,
+  "HRTF_SR@2mm": 89.2,
+  "HRTF_critical_MLE_mm": 1.022,
   "per_region_MLE_mm": {
-    "Helix": 1.324,
-    "Antihelix/Concha": 1.042,
-    "Outer boundary": 1.646,
-    "Cross-section": 1.274
+    "Helix": 1.283,
+    "Antihelix/Concha": 1.019,
+    "Outer boundary": 1.702,
+    "Cross-section": 1.149
   }
 }
