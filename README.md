@@ -172,15 +172,16 @@ framework. Full details, the negative results (what was measured *not* to work),
 the path toward the 0.5 mm target are in
 **[`deep_model/README.md`](deep_model/README.md)**.
 
-**What limits us is now measured.** The ground truth is precise — landmarks sit
-**0.006 mm** from the surface and contour spacing is algorithmically equidistant — so
-the remaining error is *model* error, not label noise. It is dominated by **tangential**
-sliding *along* the contours, and those landmarks provably have **no local geometric
-signature** to detect (curvature is flat along the contour at every scale; the GT was
-built by tracing contours and resampling by arc length). A per-point detector is
-therefore the wrong framing; the route to the 0.5 mm target is curve-based (dense-surface
-SSM + non-rigid registration) — see
-[`deep_model/README.md`](deep_model/README.md#what-limits-us-measured).
+**Where the error lives (exact decomposition, 340 out-of-fold ears).** In an orthonormal
+local frame the energy splits **77.7 % along-contour**, 20.2 % across-contour, 2.1 %
+normal — so the dominant term is *correspondence* (position **along** the curve), not
+surface localisation. An oracle that only reparametrises our own predicted curve reaches
+0.566 mm, and that gain is real (95–100 % transfers to held-out landmarks). But the phase
+is **not predictable from the surface**: it correlates +0.35…+0.44 between a subject's two
+ears (same annotation session, different geometry) yet ≈0 between geometry-matched ears of
+different subjects — it is an annotation-process artifact. Full derivation, the exact
+cross-term, and an explicit retraction of an earlier invalid "floor" estimate are in
+[`deep_model/README.md`](deep_model/README.md#where-the-remaining-error-actually-is-correspondence-and-why-it-is-irreducible).
 
 <details>
 <summary><b>Classical baseline — Dense V4 (1.8738 mm)</b></summary>

@@ -12,8 +12,9 @@ previously committed model** on the one-shot test set (2.65 mm).
 > precise (0.006 mm from the surface), but their *parametrisation along each contour*
 > carries a per-annotation-session component that no surface model can recover — measured
 > in [why the remaining error is irreducible](#where-the-remaining-error-actually-is-correspondence-and-why-it-is-irreducible).
-> That puts a floor near **1.19 mm** on any geometry-driven method, so 0.5 mm is **not**
-> reachable under this annotation protocol.
+> Under the (stated, falsifiable) assumption that this phase is unpredictable, a
+> geometry-perfect method would still score ≈ **1.06 mm**; treat that as a hypothesis,
+> not a proven bound.
 
 ![results](results/deep_results.png)
 
@@ -271,16 +272,42 @@ Similar geometry implies no shared phase; the same session does. **The contour p
 artifact of the annotation process, not a property of the surface** — so no amount of
 surface modelling can recover it.
 
-### The floor this implies
+### What this implies — stated as a hypothesis, not a proven bound
 
-With curve/geometry error 0.566 mm and total 1.3144 mm, the along-curve phase component is
-√(1.3144² − 0.566²) = **1.19 mm**. So even with *perfect* geometry, an unknowable phase
-leaves ≈ 1.19 mm. Notably, the strongest reported competing pipeline (1.1726 mm) sits
-essentially **at that floor** — both approaches appear to be hitting the same
-annotation-determined wall. Beating ~1.17 mm therefore means improving **geometry**
-(denser surface re-querying, more refinement passes); the organizers' 0.5 mm target is not
-reachable under this annotation protocol unless the labels themselves are re-parametrised
-consistently.
+**Retraction.** An earlier version of this document asserted a "measured floor" of
+1.19 mm from √(1.3144² − 0.5657²). That calculation was **invalid**: it mixed
+means-of-Euclidean-distances with an energy (Pythagorean) identity, assumed the geometry
+and phase components were orthogonal without testing it, and dropped the cross-term.
+
+The exact vector-level decomposition, computed properly
+(`scratch/decomp_valid.py`, 340 OOF ears; orthonormal local frame verified to 2e-15):
+
+| local-frame component | RMSE (mm) | energy share | mean abs (mm) |
+| --- | ---: | ---: | ---: |
+| along-contour **t** | 1.4465 | **77.7 %** | 1.0550 |
+| across-contour **b** | 0.7374 | 20.2 % | 0.5455 |
+| surface normal **n** | 0.2366 | 2.1 % | 0.1213 |
+| total | 1.6407 | 100 % | 1.3144 (the metric) |
+
+and the oracle-displacement identity, with the cross-term **measured**:
+
+```
+<|e_base|²> = <|e_oracle|²> + <|d|²> − 2<e_oracle·d>
+   2.6919   =     0.5793    +  2.0918  +   0.0208      (residual 0.00e+00)
+normalised cross-term  <e_o·d> / (rms|e_o|·rms|d|)  =  −0.009   → near-orthogonal
+```
+
+So the two components *are* empirically near-orthogonal (that is now measured, not
+assumed), and the phase displacement has **mean |d| = 1.057 mm** (RMSE 1.446).
+
+**Hypothesis (not a bound):** if the along-contour phase were entirely unpredictable and
+unchanged by better geometry, a method with perfect curve geometry would still score
+≈ mean |d| ≈ 1.06 mm on this metric. Stated assumptions, each of which could fail:
+(i) "unpredictable by the three model families we tried" is weaker than "unpredictable in
+principle"; (ii) improving geometry may change d itself; (iii) mean-of-Euclidean and RMS
+are different functionals and must not be interchanged. The strongest reported competing
+pipeline (1.1726 mm) is close to this figure, which is consistent with — but does not
+prove — a shared annotation-driven limit.
 
 ## What could still be improved (and what cannot)
 
