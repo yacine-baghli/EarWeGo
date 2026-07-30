@@ -1,29 +1,33 @@
 # Deep Contour-Ensemble Landmark Model
 
-Best validated model in this repository: **1.329 mm** mean landmark error on the
-held-out validation split (60 ears / 30 subjects) — a **28 % improvement over the
+Best validated model in this repository: **1.309 mm** mean landmark error on the
+held-out validation split (60 ears / 30 subjects) — a **30 % improvement over the
 classical Dense-V4 pipeline** (1.85 mm val) and a **2× improvement over the
 previously committed model** on the one-shot test set (2.65 mm).
+
+> **Target (from the organizers):** < 0.5 mm is "good", < 0.2 mm "very good", because
+> these landmarks feed pinna measurements used for HRTFs
+> ([Dinakaran et al., ICASSP 2018](https://depositonce.tu-berlin.de/items/f9757195-f1a2-493a-809e-a4a4a7de7f49):
+> ~1 mm surface precision preserves localization cues). We are **not there yet** —
+> see [the analysis of what limits us](#what-limits-us-measured) — but the ground
+> truth is precise enough (~0.006 mm off-surface) that sub-0.5 mm is achievable in
+> principle, so the remaining error is *model* error, not label noise.
 
 ![results](results/deep_results.png)
 
 | Metric (validation, 60 ears) | Result |
 | --- | ---: |
-| Mean landmark error (MLE) | **1.329 mm** |
-| Median landmark error | 1.143 mm |
-| RMSE | 1.586 mm |
-| 95 % CI for the mean | **[1.242, 1.414] mm** |
-| Worst-ear mean | 2.245 mm *(classical: 6.36)* |
-| Best-ear mean | 0.710 mm |
-| Success rate @ 2 mm | 81.9 % |
+| Mean landmark error (MLE) | **1.309 mm** |
+| Median landmark error | 1.123 mm |
+| RMSE | 1.577 mm |
+| 95 % CI for the mean | [1.222, 1.394] mm |
+| Worst-ear mean | 2.224 mm *(classical: 6.36)* |
+| Best-ear mean | 0.687 mm |
+| Success rate @ 2 mm | 82.1 % |
 | Success rate @ 3 mm | 93.5 % |
 | Success rate @ 5 mm | 98.9 % |
-| HRTF-critical SR @ 2 mm | 88.9 % |
-| HRTF-critical MLE | 1.092 mm |
-
-The competition-winning reference is 1.29 mm; that value sits **inside our 95 %
-confidence interval**, i.e. at n = 60 the two are statistically indistinguishable.
-See [Beating 1.29](#beating-129-mm) for the concrete path below it.
+| HRTF-critical SR @ 2 mm | 89.0 % |
+| HRTF-critical MLE | 1.068 mm |
 
 ## Architecture
 
@@ -115,16 +119,26 @@ Best recipe is the **4-seed ensemble, raw** (`blend=0.0`, `tta=False`): with the
 contour head + ensemble already removing the tangential error, the SSM projection
 and TTA no longer help.
 
-## Why 1.329 mm is the floor (exhaustively measured)
+## What limits us (measured)
 
-Two adversarial investigations plus dozens of local measurements established that
-**1.329 mm is the practical floor for this dataset + architecture.** The reason is
-structural: the **median** per-landmark error is already **1.07 mm** — the *mean* is
-pulled up by an ~11 % tail of ambiguous rim landmarks (worst: idx 70–74) whose error
-is **~85 % tangential** (sliding *along* the contour). That tail is largely
-**irreducible ground-truth annotation ambiguity** plus a **280-ear data ceiling**
-(the model is ~97 % variance-limited). Every modeling lever was *measured*, not
-guessed:
+**Correction to an earlier conclusion:** we previously called ~1.33 mm an
+"annotation-noise floor". That was **wrong** — it was calibrated against a mistaken
+1.29 mm target. Direct measurement shows the ground truth is highly precise:
+landmarks sit **0.006 mm** from the mesh surface (96.5 % within 0.05 mm), contour
+spacing is **algorithmically equidistant** (gap CV 0.011–0.018 on two contours), and
+intrinsic point jitter is only ~0.15 mm. **The remaining error is model error.**
+
+The dominant component is **tangential** — sliding *along* the contour (1.06 mm vs
+0.61 mm perpendicular). Measured cause: the landmarks have **no local geometric
+signature** to detect. Surface curvature along the contour is flat (~5°/mm) at *every*
+scale down to the 0.5 mm mesh resolution, and the nearest curvature feature sits
+1.2–1.4 mm away (no better than random). **The GT was built by tracing contours,
+projecting to the surface, and resampling by arc length** — so 30 of the 85 landmarks
+are pure arc-length samples with no detectable local identity. A per-point detector
+fundamentally cannot place them; that is the wrong framing, and it is why the levers
+below all fail.
+
+Levers that were *measured* (not guessed) and do **not** work:
 
 | lever | result | why |
 |---|---|---|
@@ -134,32 +148,38 @@ guessed:
 | richer SSM prior / projection | ≤ 0 mm | 60–70 % of error energy is *inside* the SSM subspace |
 | cascade / tighter crops | dead | point density uncorrelated with error (r=0.06) |
 | relational / global head | ≈ 0 | the boundary slides as a unit; added capacity overfits |
-| continuous-surface snap | dead | predictions already 0.31 mm from the surface |
 | bilateral symmetry | dead | a person's L/R ears differ 1.59 mm > our error |
 | TTA, Huber, confidence-gating | ≤ 0.015 (within noise) | attack the same variance term |
+| **hard equal-arc-length layer** | **worse** (1.43 vs 1.40) | correct idea, but resampling propagates the *endpoint* error (lm 74 is one of the worst) across the whole contour — even with 6× endpoint loss weight |
 
-**The only remaining small gains** (do at submission time): train the final weights
-on **train + val** (280 → 340 ears, ~0.05 mm on the val→test gap, unverifiable), and
-ship the 4-seed ensemble **without TTA**.
+What **does** work, and is shipped: **exact point-to-triangle surface projection**
+(`surfproj.py`). GT lies 0.006 mm off the surface, raw predictions ~0.17 mm off, so
+projecting along the normal is a free systematic gain: **1.329 → 1.309 mm**,
+improving **100 % of ears** (paired t-test p = 2e-29).
 
-## The real path below the floor — new *information*, not new modeling
+## The path toward the 0.5 mm target
 
-Genuine improvement requires new data, since the ceiling is data/annotation-limited:
+The GT's own generative process is the blueprint — **contours, not points**:
 
-1. **External 3D ear data → self-supervised backbone pretraining** (highest leverage;
-   directly attacks the 280-ear overfitting). Public, in-domain, permissively-licensed
-   candidates (~700+ extra ear meshes): **SONICOM** (200 subj, MIT), **AudioEar3D**
-   (112 scans, GitHub), **HUTUBS** (96 subj, CC-BY — but co-created by Huawei, so
-   check the challenge rules and subject overlap for leakage). A published ear 3D
-   morphable model, the **York Ear Model (YEM)**, could replace the 30-comp SSM prior.
-2. **Multi-annotator re-labeling** of the ~5 ambiguous tail landmarks (70–74) to
-   denoise the ground truth itself — what actually drags the mean above the 1.07 median.
-3. *(Research bet)* a **tangent-aware / arc-length correspondence loss** — the only
-   idea that targets the dominant tangential error, but likely capped by annotation noise.
+1. **Dense-surface SSM + non-rigid ICP (recommended).** Register one landmarked
+   template ear onto every training ear (GT landmarks as anchors) to get dense
+   correspondence, PCA a dense-vertex shape model in which the 85 landmarks are fixed
+   barycentric points, then at test time fit that model to the *whole surface*.
+   Thousands of surface points over-determine each landmark's along-contour position —
+   the only measured mechanism that can fix tangential error — then arc-length-resample
+   to reproduce the GT construction. Estimated 0.5–0.7 mm; gated by contour-endpoint
+   accuracy. **Run the cheap kill-gate first:** check that transported-template +
+   resampling reproduces val GT before building the full SSM.
+2. **Contour-endpoint detector.** All arc-length machinery hinges on the ~8 contour
+   endpoints; they are currently the worst landmarks (idx 70–74 ≈ 2.5 mm).
+3. **More real labeled ears** (external 3D-ear data → backbone pretraining):
+   **SONICOM** (200 subj, MIT), **AudioEar3D** (112 scans), **HUTUBS** (96 subj, CC-BY —
+   co-created by Huawei, so check challenge rules *and* subject overlap for leakage);
+   the **York Ear Model** could replace the 30-comp SSM prior.
+4. At submission time: train the final weights on **train + val** (340 ears).
 
-> ⚠️ Before using any external dataset, confirm the competition permits external data,
-> and verify no subject overlap with the challenge set (SONICOM/HUTUBS are the same
-> HRTF-pinna domain as this challenge). See the session notes for the full search.
+> ⚠️ Before using any external dataset, confirm the competition permits external data
+> and verify no subject overlap with the challenge set.
 
 ## Training
 

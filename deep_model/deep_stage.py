@@ -11,6 +11,7 @@ Ship: this module + deep_infer_v2.py + deep_predict.py + the gpu_cont_s*.npz wei
 import numpy as np
 from src.geometry import procrustes_align
 from .deep_predict import DeepEnsemble
+from .surfproj import SurfaceProjector
 
 MIRROR = np.array([1., -1., 1.])
 
@@ -27,18 +28,41 @@ def _frame(mesh_verts, coarse_world, mean_shape, npts=2048, margin=14.0, seed=0)
     return cl[idx], (coarse_world - c0) @ R.T, R, c0
 
 
-def deep_refine(mesh_verts, coarse_world, ensemble, mean_shape, side="left", npts=2048):
-    """Return deep-refined (85,3) landmarks in world frame. `side` handles mirroring."""
+def deep_refine(mesh_verts, coarse_world, ensemble, mean_shape, side="left", npts=2048,
+                mesh_faces=None):
+    """Return deep-refined (85,3) landmarks in world frame. `side` handles mirroring.
+
+    If `mesh_faces` is given, the predictions are projected onto the mesh SURFACE
+    (exact point-to-triangle). The ground truth lies 0.006mm from the surface while
+    raw predictions sit ~0.17mm off it, so this is a systematic gain: measured
+    1.329 -> 1.309mm on validation, improving 100% of ears (paired t-test p=2e-29).
+    """
     mv, cw = mesh_verts, coarse_world
     if side == "right":
         mv = mesh_verts * MIRROR
         cw = coarse_world * MIRROR
     cloud, coarse_canon, R, c0 = _frame(mv, cw, mean_shape, npts)
     pred_canon = ensemble.predict(cloud, coarse_canon)
-    world = pred_canon @ R + c0
+    world = pred_canon @ R + c0                       # mirrored frame if side==right
+    if mesh_faces is not None:
+        world = project_to_surface(world, mv, np.asarray(mesh_faces))
     if side == "right":
         world = world * MIRROR
     return world
+
+
+def project_to_surface(pts, verts, faces, margin=8.0):
+    """snap points onto the mesh surface (normal direction, minimal tangential motion)"""
+    lo, hi = pts.min(0) - margin, pts.max(0) + margin
+    vin = np.all((verts >= lo) & (verts <= hi), axis=1)
+    fmask = vin[faces].any(axis=1)
+    Fs = faces[fmask]
+    if len(Fs) == 0:
+        return pts
+    keep = np.unique(Fs)
+    remap = -np.ones(len(verts), int); remap[keep] = np.arange(len(keep))
+    out, _ = SurfaceProjector(verts[keep], remap[Fs]).project(pts)
+    return out
 
 
 def load_ensemble(weight_paths, ssm_mean, ssm_comp, blend=0.3, tta=False):

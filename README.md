@@ -4,46 +4,52 @@
 
 This repository contains a professional implementation of a hybrid 3D geometry pipeline to automatically extract **85 pinna (outer ear) landmarks** from human head scans. The solution runs **entirely landmark-free at test time**, utilizing surface curvature, shape priors, and statistical regression to achieve high precision and robustness.
 
-## Best Validated Version — Deep Contour Ensemble (1.329 mm)
+## Best Validated Version — Deep Contour Ensemble (1.309 mm)
 
 The best model is a **deep point-cloud network that refines the classical estimate**,
-reaching a validation mean landmark error of **1.329 mm** (60 ears / 30 subjects) —
-a **28 % improvement over the classical Dense-V4 pipeline** and a **2× improvement**
+reaching a validation mean landmark error of **1.309 mm** (60 ears / 30 subjects) —
+a **30 % improvement over the classical Dense-V4 pipeline** and a **2× improvement**
 over the previously committed model on the one-shot test set (2.65 mm).
+
+**Target:** the organizers specify **< 0.5 mm** ("good") and **< 0.2 mm** ("very good"),
+since these landmarks feed pinna measurements used for HRTFs. We are not there yet; the
+ground truth is precise to ~0.006 mm, so the remaining error is *model* error and the
+target is reachable in principle — the measured obstacle and the concrete plan are in
+[`deep_model/README.md`](deep_model/README.md).
 
 ![deep results](deep_model/results/deep_results.png)
 
 | Validation metric (60 ears) | Deep ensemble | Classical Dense-V4 |
 | --- | ---: | ---: |
-| Mean landmark error | **1.329 mm** | 1.874 mm |
-| Median landmark error | 1.143 mm | 1.718 mm |
-| RMSE | 1.586 mm | — |
-| 95 % CI for the mean | **[1.242, 1.414] mm** | — |
-| Worst-ear mean | 2.245 mm | 6.36 mm |
-| Success rate @ 2 mm | **81.9 %** | 65.5 % |
+| Mean landmark error | **1.309 mm** | 1.874 mm |
+| Median landmark error | 1.123 mm | 1.718 mm |
+| RMSE | 1.577 mm | — |
+| 95 % CI for the mean | [1.222, 1.394] mm | — |
+| Worst-ear mean | 2.224 mm | 6.36 mm |
+| Success rate @ 2 mm | **82.1 %** | 65.5 % |
 | Success rate @ 3 mm | **93.5 %** | 84.1 % |
 | Success rate @ 5 mm | **98.9 %** | 95.9 % |
-| HRTF-critical SR @ 2 mm | 88.9 % | — |
+| HRTF-critical SR @ 2 mm | 89.0 % | — |
 
-The competition-winning reference (1.29 mm) sits **inside the 95 % confidence
-interval** — statistically indistinguishable at this sample size. Full architecture,
-the key finding (≈60 % of the error is *tangential* — landmark sliding *along*
-contours — which a per-region **contour-structured refinement head** corrects), the
-torch-free NumPy inference (parity-verified to 5e-6), and reproduction instructions
-are in **[`deep_model/README.md`](deep_model/README.md)**.
+Full architecture, the key findings (≈60 % of the error is *tangential* — landmark
+sliding *along* contours — which a per-region **contour-structured refinement head**
+partly corrects, plus exact **point-to-triangle surface projection** that improved
+100 % of ears), the torch-free NumPy inference (parity-verified to 4e-6), and
+reproduction instructions are in **[`deep_model/README.md`](deep_model/README.md)**.
 
 ```bash
 python -m deep_model.evaluate_deep   # reproduce the metrics + figure (no PyTorch, no raw data)
 ```
 
-**1.329 mm is the measured floor for this dataset.** Two adversarial investigations
-plus dozens of grounded measurements ruled out every modeling lever (more seeds,
-synthetic data, curvature features, richer priors, cascade, relational/global heads,
-bilateral symmetry, surface-snap) — all wash-or-worse — because the mean is limited by
-**ground-truth annotation ambiguity** on ~5 rim landmarks plus a **280-ear data
-ceiling**. Genuine improvement needs new *information* (external 3D-ear data for
-backbone pretraining, or re-labeling the ambiguous landmarks), not new architecture —
-see [`deep_model/README.md`](deep_model/README.md#why-1329-mm-is-the-floor-exhaustively-measured).
+**What limits us is now measured.** The ground truth is precise — landmarks sit
+**0.006 mm** from the surface and contour spacing is algorithmically equidistant — so
+the remaining error is *model* error, not label noise. It is dominated by **tangential**
+sliding *along* the contours, and those landmarks provably have **no local geometric
+signature** to detect (curvature is flat along the contour at every scale; the GT was
+built by tracing contours and resampling by arc length). A per-point detector is
+therefore the wrong framing; the route to the 0.5 mm target is curve-based (dense-surface
+SSM + non-rigid registration) — see
+[`deep_model/README.md`](deep_model/README.md#what-limits-us-measured).
 
 <details>
 <summary><b>Classical baseline — Dense V4 (1.8738 mm)</b></summary>

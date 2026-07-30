@@ -16,9 +16,11 @@ from src.evaluation import LANDMARK_GROUPS, HRTF_CRITICAL_LANDMARKS
 
 HERE = Path(__file__).resolve().parent
 PROGRESSION = [("classical (test)", 2.65), ("classical (val)", 1.85),
-               ("deep DGCNN", 1.50), ("+contour head", 1.375), ("+4-seed ensemble", 1.329)]
-SCALING = [(1, 1.375), (2, 1.350), (4, 1.329)]
-ASYMPTOTE, TARGET = 1.283, 1.29
+               ("deep DGCNN", 1.50), ("+contour head", 1.375),
+               ("+4-seed ensemble", 1.329), ("+surface proj", 1.309)]
+SCALING = [(1, 1.375), (2, 1.350), (4, 1.329), (6, 1.330)]
+ASYMPTOTE = 1.33          # MEASURED ensemble saturation (4-seed 1.329 == 6-seed 1.330)
+TARGET = 0.5              # organizers' target: <0.5mm "good", <0.2mm "very good"
 
 
 def _bootstrap_ci(per_ear, n=1000, seed=42):
@@ -74,14 +76,18 @@ def make_figure(dists):
     a = ax[0, 0]
     vals = [v for _, v in PROGRESSION]
     cols = [MUTED, MUTED, "#b9c0c7", "#7fb3d5", BLUE]
-    a.bar(range(len(vals)), vals, color=cols, width=0.66, zorder=3)
+    a.bar(range(len(vals)), vals, color=cols[:len(vals)], width=0.66, zorder=3)
     a.axhline(TARGET, color="#D55E00", lw=1.4, ls=(0, (4, 3)), zorder=2)
-    a.text(len(vals) - 0.7, TARGET, " 1.29 target", color="#D55E00", va="center", fontsize=8.5)
+    a.text(len(vals) - 0.5, TARGET + 0.06, "0.5mm target", color="#D55E00",
+           va="bottom", ha="right", fontsize=8.5)
     for i, v in enumerate(vals):
         a.text(i, v + 0.05, f"{v:.2f}", ha="center", va="bottom",
                fontweight="bold" if i == len(vals) - 1 else "normal", fontsize=9)
+    short = {"classical (test)": "classical\n(test)", "classical (val)": "classical\n(val)",
+             "deep DGCNN": "deep\nDGCNN", "+contour head": "+contour\nhead",
+             "+4-seed ensemble": "+4-seed\nensemble", "+surface proj": "+surface\nproj"}
     a.set_xticks(range(len(vals)))
-    a.set_xticklabels([n.replace(" (", "\n(") for n, _ in PROGRESSION], fontsize=8.1)
+    a.set_xticklabels([short.get(n, n) for n, _ in PROGRESSION], fontsize=7.6)
     a.set_ylabel("mean landmark error (mm)"); a.set_ylim(0, 2.9)
     a.set_title("A · Accuracy progression", loc="left", fontweight="bold", fontsize=10.5); strip(a)
 
@@ -112,12 +118,12 @@ def make_figure(dists):
     for n, e in zip(ns, es):
         a.text(n, e + 0.006, f"{e:.3f}", ha="center", va="bottom", fontsize=9)
     a.axhline(ASYMPTOTE, color=MUTED, lw=1.2, ls=(0, (4, 3)), zorder=2)
-    a.text(4, ASYMPTOTE + 0.003, f"≈{ASYMPTOTE} asymptote (fit)", ha="right", va="bottom", color=MUTED, fontsize=8.3)
-    a.axhline(TARGET, color="#D55E00", lw=1.2, ls=(0, (4, 3)), zorder=2)
-    a.text(1, TARGET + 0.002, "1.29 target", ha="left", va="bottom", color="#D55E00", fontsize=8.3)
+    a.text(6, ASYMPTOTE + 0.003, f"saturates ≈{ASYMPTOTE} (measured)", ha="right",
+           va="bottom", color=MUTED, fontsize=8.3)
     a.set_xticks(ns); a.set_xlabel("ensemble size (seeds)"); a.set_ylabel("mean landmark error (mm)")
-    a.set_ylim(1.27, 1.39)
-    a.set_title("D · Ensemble scaling", loc="left", fontweight="bold", fontsize=10.5); strip(a)
+    a.set_ylim(1.30, 1.39)
+    a.set_title("D · Ensemble saturates (more seeds ≠ better)", loc="left",
+                fontweight="bold", fontsize=10.5); strip(a)
 
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     fig.savefig(HERE / "results" / "deep_results.png", bbox_inches="tight", facecolor="white")
