@@ -309,6 +309,54 @@ are different functionals and must not be interchanged. The strongest reported c
 pipeline (1.1726 mm) is close to this figure, which is consistent with — but does not
 prove — a shared annotation-driven limit.
 
+### Both error directions are annotation-session artifacts
+
+The along-contour (phase) finding above generalises. An **orthogonal geometry corrector**
+was built specifically to sidestep phase: it predicts only two scalars per landmark and
+applies `p + α·b + β·n`, with **no** displacement along the contour tangent, so it
+*cannot* slide landmarks and therefore cannot memorise session phase (verified: the
+along-contour error component is unchanged to 1.2e-14). Its oracle is worth **0.26 mm**
+(1.3144 → 1.0550 if `e_b` and `e_n` were cancelled exactly), so the target was real.
+
+It is nevertheless **rejected**, identically under two objectives:
+
+| variant | OOF | folds improved |
+| --- | ---: | --- |
+| phase-robust proxy (Chamfer + Huber, tangential ×0.1, ordered ×0.2) | 1.3550 | 0/5 |
+| metric-aligned (ordered mean-Euclidean) | 1.3569 | 0/5 |
+
+so the objective was not the cause. In-sample it fits (train 1.3055 → 1.1490) while
+held-out **degrades monotonically** with training (1.3874 → 1.4126) — memorisation again.
+The reason is the same as for phase: **the across-contour error is also session-bound.**
+
+| contour | within-subject *r* | geometry-matched *r* | mean offset |
+| --- | ---: | ---: | ---: |
+| outer helix | +0.548 | −0.110 | 0.310 mm |
+| concha | +0.520 | −0.097 | 0.277 mm |
+| inner helix | +0.558 | −0.043 | 0.268 mm |
+| sup. antihelix | +0.451 | −0.086 | 0.646 mm |
+
+Together with the phase result this accounts for **77.7 % + 20.2 % ≈ 98 % of the error
+energy**; only the 2.1 % surface-normal component is genuinely geometric, and the exact
+point-to-triangle projection already exploits it. **Five model families have now failed
+in the same way** (ridge on predicted landmarks; surface-conditioned CNN → affine;
+endpoint-localisation heatmap; orthogonal corrector under two objectives): each fits its
+training ears and gains nothing out-of-fold.
+
+### Cheap inference ablations (all rejected)
+
+On OOF predictions (baseline 1.3355): area-weighted triangle sampler 1.4015; K = 32/64/96
+→ 1.3481/1.3374/1.3524; GK = 12/32 → 1.5666/1.3364; soft-argmax temperature 0.7/1.3/1.7 →
+1.3396/1.3553/1.4056. Aggregation over fresh samples: the plain **mean** wins
+(coordinate-median 1.3381, geometric-median 1.3395, trimmed 1.3459). Four per-contour
+dense-SSM blend coefficients under nested CV (1.2721) do not beat one global α (1.2713).
+
+The lesson is structural: **these are train-time choices, not inference knobs.** The
+network is adapted to the sampler and neighbourhood radius it trained with, so altering
+them at inference only introduces train/test mismatch. The same confound invalidates the
+earlier 8192-point test, where GK and K were held fixed while the point count rose —
+shrinking the physical neighbourhood. Testing any of them fairly requires **retraining**.
+
 ## What could still be improved (and what cannot)
 
 The GT's own generative process is the blueprint — **contours, not points**:
