@@ -31,15 +31,105 @@ target is reachable in principle — the measured obstacle and the concrete plan
 | Success rate @ 5 mm | **98.9 %** | 95.9 % |
 | HRTF-critical SR @ 2 mm | 88.7 % | — |
 
-Full architecture, the key findings (≈60 % of the error is *tangential* — landmark
-sliding *along* contours — which a per-region **contour-structured refinement head**
-partly corrects, plus exact **point-to-triangle surface projection** that improved
-100 % of ears), the torch-free NumPy inference (parity-verified to 4e-6), and
-reproduction instructions are in **[`deep_model/README.md`](deep_model/README.md)**.
-
 ```bash
 python -m deep_model.evaluate_deep   # reproduce the metrics + figure (no PyTorch, no raw data)
 ```
+
+---
+
+## Architecture of the best model (1.294 mm)
+
+The deep model does not predict landmarks from scratch: it **refines** the classical
+pipeline's coarse estimate (~3.68 mm, [see below](#system-architecture)). Every stage
+below is justified by a measurement, and its contribution was measured in isolation.
+
+```
+raw head mesh (PLY)  ──►  classical pipeline  ──►  coarse 85 landmarks (~3.68 mm)
+                                                          │
+   ┌──────────────────────────────────────────────────────┘
+   ▼
+[0] CANONICAL FRAMING          crop the ear around the coarse estimate (±14 mm),
+                               rotation-align to the SSM mean shape, centre on the
+                               coarse centroid, keep true mm scale, sample 2048 pts.
+                               Right ears are mirrored into a common left frame.
+   ▼
+[1] DGCNN BACKBONE             3 × EdgeConv on a static k-NN graph (k=20) over the
+                               point cloud → 64/128/128 features, concatenated (320)
+                               → fused to 256, then max-pooled global context mixed
+                               back per point → 256-d per-point features.
+   ▼
+[2] ITERATIVE OFFSET → SNAP    ×4 passes, independently per landmark:
+    HEAD                       • OFFSET  pooled (mean+max) features of the K=48 points
+                                 nearest the current query + a per-landmark embedding
+                                 → MLP → an *unconstrained* 3-D displacement.
+                                 (Without this the model cannot reach landmarks that
+                                 lie outside the initial window — it plateaus at 2.76 mm.)
+                               • SNAP    re-window at the relocated query, attention
+                                 (softmax) over the K=48 nearest surface points →
+                                 expectation = a convex combination of real surface
+                                 points, so the prediction stays ON the surface and is
+                                 sub-point-spacing precise (expressivity floor 0.095 mm).
+   ▼
+[3] CONTOUR-STRUCTURED         the 85 landmarks form 4 ordered anatomical contours.
+    REFINEMENT                 Each contour gets its OWN 1-D convolution stack
+                               (kernels 5→3→1, width 96) running ALONG the ordered
+                               landmarks, taking [position, backbone feature (64),
+                               landmark embedding (32)].  ← largest single gain
+   ▼
+[4] 4-SEED ENSEMBLE            average the raw predictions of 4 independently trained
+                               seeds (measured to saturate at 4: 6 seeds = 1.330).
+   ▼
+[5] SURFACE PROJECTION         exact point-to-triangle snap onto the mesh (pure NumPy).
+   ▼
+[6] DENSE-SSM HYBRID FIT       a dense-vertex ear shape model is fitted to the target
+                               surface *and* to these landmarks (closed form), then
+                               blended at α=0.3 and re-projected.
+   ▼
+85 landmark coordinates (85 × 3)
+```
+
+### Measured contribution of each stage (validation, 60 ears)
+
+| stage | val MLE | Δ |
+| --- | ---: | ---: |
+| classical coarse estimate (input to the deep model) | 3.68 mm | — |
+| [1]+[2] DGCNN + iterative offset→snap head | 1.50 mm | −2.18 |
+| [3] + contour-structured refinement | 1.375 mm | −0.13 |
+| [4] + 4-seed ensemble | 1.329 mm | −0.046 |
+| [5] + exact surface projection | 1.309 mm | −0.020 |
+| [6] + dense-SSM hybrid blend | **1.294 mm** | −0.015 |
+
+### Why the contour head is the key architectural idea
+
+A per-region error decomposition showed **~60 % of the error is *tangential*** —
+landmarks sliding *along* their contour, not off the surface (worst contour: 1.59 mm
+tangential vs 0.64 perpendicular). Along a smooth rim there is **no local geometric
+cue** for where a landmark sits (surface curvature along the contour is flat, ~5°/mm at
+every scale down to the 0.5 mm mesh resolution), so a purely local window physically
+cannot resolve it — only contour-level context can. Giving each anatomical region its
+own 1-D convolution along the ordered landmarks supplies exactly that, and it also made
+the ensemble seeds decorrelate about twice as effectively.
+
+### Implementation details
+
+| | |
+| --- | --- |
+| Input | 2048-point ear cloud (canonical frame, true mm) + 85 coarse landmarks |
+| Backbone | DGCNN, static graph k=20, 3 EdgeConv layers, 256-d per-point features |
+| Head | K=48 window, T=4 offset→snap passes, per-landmark embeddings (32-d) |
+| Parameters | 813 k per seed (3.25 MB) — deliberately small for 280 training ears |
+| Loss | MSE on the final output + deep supervision on every pass (offset ×0.4, snap ×1.0, later passes weighted more) |
+| Optimiser | AdamW, lr 1.5e-3, weight decay 5e-4, cosine schedule, 1200 epochs, batch 16 |
+| Augmentation | random 1280-point subsample, random-axis rotation ±34°, scale ±10 %, surface jitter 0.25 mm, coarse-init jitter 0.9 mm |
+| Training data | 280 ears (140 subjects); left/right unified by mirroring |
+| Dense SSM \[6\] | 120 components over 23 252 template vertices (96 % variance), built by landmark-anchored non-rigid ICP on the **training split only** |
+| Inference | **pure NumPy, no PyTorch** — parity-verified to 3.6e-6 against the PyTorch reference |
+
+Trained in PyTorch on an RTX A6000; the weights are exported as plain NumPy arrays and
+the forward pass is reimplemented in NumPy, so the submission needs no deep-learning
+framework. Full details, the negative results (what was measured *not* to work), and
+the path toward the 0.5 mm target are in
+**[`deep_model/README.md`](deep_model/README.md)**.
 
 **What limits us is now measured.** The ground truth is precise — landmarks sit
 **0.006 mm** from the surface and contour spacing is algorithmically equidistant — so
@@ -67,7 +157,13 @@ The published artifacts contain source code, model weights (NumPy), configuratio
 and aggregate metrics only. Challenge data, participant split lists, host metadata,
 and per-subject results are **not** published.
 
-## System Architecture
+## System Architecture — classical pipeline (coarse stage)
+
+> This is the **classical** pipeline. On its own it reaches 1.874 mm (Dense-V4); in the
+> current best model it serves as the **coarse initialiser** (~3.68 mm for the v1
+> configuration used to train the deep model) that the
+> [deep model above](#architecture-of-the-best-model-1294-mm) refines to 1.294 mm.
+> It runs entirely landmark-free at test time.
 
 The pipeline processes raw 3D head meshes using six main stages:
 
@@ -111,6 +207,16 @@ The pipeline processes raw 3D head meshes using six main stages:
 
 ```
 Huawei_tech_arena/
+├── deep_model/                 # BEST MODEL (1.294 mm) — torch-free NumPy inference
+│   ├── deep_infer.py           # NumPy forward pass of one network (DGCNN + heads)
+│   ├── deep_predict.py         # DeepEnsemble: N networks (+ optional TTA / SSM blend)
+│   ├── deep_stage.py           # Pipeline stage: framing, mirroring, projection
+│   ├── surfproj.py             # Exact point-to-triangle surface projection
+│   ├── dense_fit.py            # Dense-SSM hybrid fit (closed form)
+│   ├── evaluate_deep.py        # Reproduce metrics + results figure
+│   ├── weights/                # 4 trained seeds (813 k params each, NumPy)
+│   ├── dense_ssm.npz           # Dense-vertex ear shape model (train split only)
+│   └── results/                # metrics.json + deep_results.png
 ├── models/                     # Saved model pickle checkpoints (.pkl)
 ├── output/                     # Diagnostic reports, evaluation stats, and plots
 ├── scratch/                    # Temporary/experimental scripts
