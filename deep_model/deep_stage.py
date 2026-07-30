@@ -29,7 +29,7 @@ def _frame(mesh_verts, coarse_world, mean_shape, npts=2048, margin=14.0, seed=0)
 
 
 def deep_refine(mesh_verts, coarse_world, ensemble, mean_shape, side="left", npts=2048,
-                mesh_faces=None):
+                mesh_faces=None, dense_ssm=None, ssm_alpha=0.3):
     """Return deep-refined (85,3) landmarks in world frame. `side` handles mirroring.
 
     If `mesh_faces` is given, the predictions are projected onto the mesh SURFACE
@@ -45,10 +45,26 @@ def deep_refine(mesh_verts, coarse_world, ensemble, mean_shape, side="left", npt
     pred_canon = ensemble.predict(cloud, coarse_canon)
     world = pred_canon @ R + c0                       # mirrored frame if side==right
     if mesh_faces is not None:
-        world = project_to_surface(world, mv, np.asarray(mesh_faces))
+        F = np.asarray(mesh_faces)
+        world = project_to_surface(world, mv, F)
+        if dense_ssm is not None:
+            # dense-SSM hybrid fit (surface + these landmarks), blended, then re-projected
+            cl = _surface_points(world, mv, margin=12.0)
+            world = dense_ssm.refine(cl, world, alpha=ssm_alpha)
+            world = project_to_surface(world, mv, F)
     if side == "right":
         world = world * MIRROR
     return world
+
+
+def _surface_points(around, verts, margin=12.0, npts=16384, seed=0):
+    """crop the mesh vertices around `around` and subsample (target for the SSM fit)"""
+    lo, hi = around.min(0) - margin, around.max(0) + margin
+    m = np.all((verts >= lo) & (verts <= hi), axis=1)
+    pts = verts[m] if m.any() else verts
+    if len(pts) > npts:
+        pts = pts[np.random.RandomState(seed).choice(len(pts), npts, replace=False)]
+    return pts
 
 
 def project_to_surface(pts, verts, faces, margin=8.0):

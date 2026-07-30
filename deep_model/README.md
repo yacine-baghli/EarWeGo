@@ -1,7 +1,7 @@
 # Deep Contour-Ensemble Landmark Model
 
-Best validated model in this repository: **1.309 mm** mean landmark error on the
-held-out validation split (60 ears / 30 subjects) — a **30 % improvement over the
+Best validated model in this repository: **1.294 mm** mean landmark error on the
+held-out validation split (60 ears / 30 subjects) — a **31 % improvement over the
 classical Dense-V4 pipeline** (1.85 mm val) and a **2× improvement over the
 previously committed model** on the one-shot test set (2.65 mm).
 
@@ -17,17 +17,17 @@ previously committed model** on the one-shot test set (2.65 mm).
 
 | Metric (validation, 60 ears) | Result |
 | --- | ---: |
-| Mean landmark error (MLE) | **1.309 mm** |
-| Median landmark error | 1.123 mm |
-| RMSE | 1.577 mm |
-| 95 % CI for the mean | [1.222, 1.394] mm |
-| Worst-ear mean | 2.224 mm *(classical: 6.36)* |
-| Best-ear mean | 0.687 mm |
-| Success rate @ 2 mm | 82.1 % |
-| Success rate @ 3 mm | 93.5 % |
+| Mean landmark error (MLE) | **1.294 mm** |
+| Median landmark error | 1.120 mm |
+| RMSE | 1.560 mm |
+| 95 % CI for the mean | [1.206, 1.379] mm |
+| Worst-ear mean | 2.216 mm *(classical: 6.36)* |
+| Best-ear mean | 0.642 mm |
+| Success rate @ 2 mm | 82.2 % |
+| Success rate @ 3 mm | 93.7 % |
 | Success rate @ 5 mm | 98.9 % |
-| HRTF-critical SR @ 2 mm | 89.0 % |
-| HRTF-critical MLE | 1.068 mm |
+| HRTF-critical SR @ 2 mm | 88.7 % |
+| HRTF-critical MLE | 1.052 mm |
 
 ## Architecture
 
@@ -57,6 +57,16 @@ ear point cloud (2048 pts, canonical frame)  +  coarse 85-landmark estimate
 [4. 4-seed ensemble]     ── average the raw predictions of 4 independently-trained
                             seeds. Decorrelates residual error.
         ▼
+[5. Surface projection]  ── exact point-to-triangle snap onto the mesh (GT lies
+        │                   0.006 mm off-surface; raw predictions ~0.17 mm).
+        │                   Improved 100 % of ears.  1.329 → 1.309 mm
+        ▼
+[6. Dense-SSM hybrid fit]── a dense-vertex ear shape model (built by
+        │                   landmark-anchored non-rigid ICP of one template onto all
+        │                   280 training ears, then PCA) is fitted to the target
+        │                   SURFACE *and* to these landmarks, closed-form; the result
+        │                   is blended (α=0.3) and re-projected.  1.309 → 1.294 mm
+        ▼
 85 refined landmark coordinates
 ```
 
@@ -83,7 +93,10 @@ it only sharpens the already-small perpendicular error.
 | `deep_stage.py` | Pipeline stage: frame a raw mesh around a coarse estimate, run the ensemble, handle left/right mirroring. |
 | `evaluate_deep.py` | Reproduce the metrics + figure from committed predictions. |
 | `weights/gpu_cont_s{0..3}.npz` | The 4 trained seeds (~3.3 MB each, NumPy arrays — no PyTorch needed). |
-| `ssm.npz` | Train-only statistical shape model (mean + 30 components) used for framing / optional projection. |
+| `surfproj.py` | Exact point-to-triangle surface projection (pure NumPy — no `rtree`/`trimesh`). |
+| `dense_fit.py` | `DenseSSMFit` — closed-form hybrid fit of the dense shape model to surface + landmarks (NumPy; matches the GPU implementation to 0.008 mm, ~0.9 s/ear). |
+| `dense_ssm.npz` | The dense-vertex ear shape model: mean + 120 orthonormal components over 23 252 template vertices, plus the template faces and the 85 landmarks as barycentric points (32 MB). Built from the **training split only**. |
+| `ssm.npz` | Train-only 85-landmark shape model (mean + 30 components) used for framing. |
 | `val_errors.npz` | Per-landmark error **distances** of the 4-seed ensemble on validation (no landmark coordinates — no challenge data published), for reproducible metrics. |
 
 **No PyTorch is required at inference** — training was done in PyTorch on GPU, then
@@ -109,15 +122,22 @@ ssm = np.load("deep_model/ssm.npz")
 ens = load_ensemble(sorted(glob.glob("deep_model/weights/gpu_cont_s*.npz")),
                     ssm["ssm_mean"], ssm["ssm_comp"], blend=0.0, tta=False)
 
+from deep_model.dense_fit import DenseSSMFit
+dense = DenseSSMFit("deep_model/dense_ssm.npz")     # optional stages 5-6
+
 # coarse_world: (85,3) coarse estimate from the classical pipeline (world frame)
-# mesh_verts:   (V,3) mesh vertices (world frame)
+# mesh_verts / mesh_faces: the subject's mesh (world frame)
 landmarks = deep_refine(mesh_verts, coarse_world, ens, ssm["ssm_mean"].reshape(85, 3),
-                        side="left")   # or side="right"
+                        side="left",                 # or "right"
+                        mesh_faces=mesh_faces,       # enables surface projection
+                        dense_ssm=dense, ssm_alpha=0.3)   # enables the dense-SSM fit
 ```
 
-Best recipe is the **4-seed ensemble, raw** (`blend=0.0`, `tta=False`): with the
-contour head + ensemble already removing the tangential error, the SSM projection
-and TTA no longer help.
+Best recipe: **4-seed ensemble, raw** (`blend=0.0`, `tta=False` — with the contour head
+and ensemble already handling the tangential error, the 85-landmark SSM projection and
+TTA no longer help), then **surface projection**, then the **dense-SSM hybrid fit**
+blended at α=0.3. Omitting `mesh_faces`/`dense_ssm` gives the 1.329 mm model with no
+mesh-face dependency and no 32 MB shape model.
 
 ## What limits us (measured)
 
@@ -152,10 +172,25 @@ Levers that were *measured* (not guessed) and do **not** work:
 | TTA, Huber, confidence-gating | ≤ 0.015 (within noise) | attack the same variance term |
 | **hard equal-arc-length layer** | **worse** (1.43 vs 1.40) | correct idea, but resampling propagates the *endpoint* error (lm 74 is one of the worst) across the whole contour — even with 6× endpoint loss weight |
 
-What **does** work, and is shipped: **exact point-to-triangle surface projection**
-(`surfproj.py`). GT lies 0.006 mm off the surface, raw predictions ~0.17 mm off, so
-projecting along the normal is a free systematic gain: **1.329 → 1.309 mm**,
-improving **100 % of ears** (paired t-test p = 2e-29).
+What **does** work, and is shipped:
+
+1. **Exact point-to-triangle surface projection** (`surfproj.py`). GT lies 0.006 mm
+   off the surface, raw predictions ~0.17 mm off, so projecting along the normal is a
+   free systematic gain: **1.329 → 1.309 mm**, improving **100 % of ears** (p = 2e-29).
+2. **Dense-SSM hybrid fit** (`dense_fit.py`): **1.309 → 1.294 mm**. Honest accounting —
+   the dense shape model **alone is worse** than the detector (1.36 vs 1.33; its
+   landmark reconstruction *capacity* is 0.348 mm, so the limit is not capacity but
+   **correspondence ambiguity**: many shape/pose configurations explain the same
+   surface, differing by sliding, which is why a pure surface fit reaches only 1.82 mm).
+   Its value is *decorrelated* error, so it helps only as a blend (α=0.3). The gain is
+   small but robust: split-half validation gives **+0.011 mm out-of-sample, positive in
+   100 % of 200 repetitions** (p = 1e-177). Costs 32 MB + ~0.9 s/ear — a fair trade to
+   question if size matters more than 0.015 mm.
+
+A **naive** non-rigid ICP transport (no shape model) was also tried and is much worse
+(2.44 vs 1.92 mm on the same ears) — the template slides freely along the smooth
+surface. Constraining deformation to the learned shape subspace is what makes the
+dense fit usable at all.
 
 ## The path toward the 0.5 mm target
 

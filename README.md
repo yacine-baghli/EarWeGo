@@ -4,11 +4,11 @@
 
 This repository contains a professional implementation of a hybrid 3D geometry pipeline to automatically extract **85 pinna (outer ear) landmarks** from human head scans. The solution runs **entirely landmark-free at test time**, utilizing surface curvature, shape priors, and statistical regression to achieve high precision and robustness.
 
-## Best Validated Version — Deep Contour Ensemble (1.309 mm)
+## Best Validated Version — Deep Contour Ensemble + Dense SSM (1.294 mm)
 
 The best model is a **deep point-cloud network that refines the classical estimate**,
-reaching a validation mean landmark error of **1.309 mm** (60 ears / 30 subjects) —
-a **30 % improvement over the classical Dense-V4 pipeline** and a **2× improvement**
+reaching a validation mean landmark error of **1.294 mm** (60 ears / 30 subjects) —
+a **31 % improvement over the classical Dense-V4 pipeline** and a **2× improvement**
 over the previously committed model on the one-shot test set (2.65 mm).
 
 **Target:** the organizers specify **< 0.5 mm** ("good") and **< 0.2 mm** ("very good"),
@@ -21,15 +21,15 @@ target is reachable in principle — the measured obstacle and the concrete plan
 
 | Validation metric (60 ears) | Deep ensemble | Classical Dense-V4 |
 | --- | ---: | ---: |
-| Mean landmark error | **1.309 mm** | 1.874 mm |
-| Median landmark error | 1.123 mm | 1.718 mm |
-| RMSE | 1.577 mm | — |
-| 95 % CI for the mean | [1.222, 1.394] mm | — |
-| Worst-ear mean | 2.224 mm | 6.36 mm |
-| Success rate @ 2 mm | **82.1 %** | 65.5 % |
-| Success rate @ 3 mm | **93.5 %** | 84.1 % |
+| Mean landmark error | **1.294 mm** | 1.874 mm |
+| Median landmark error | 1.120 mm | 1.718 mm |
+| RMSE | 1.560 mm | — |
+| 95 % CI for the mean | [1.206, 1.379] mm | — |
+| Worst-ear mean | 2.216 mm | 6.36 mm |
+| Success rate @ 2 mm | **82.2 %** | 65.5 % |
+| Success rate @ 3 mm | **93.7 %** | 84.1 % |
 | Success rate @ 5 mm | **98.9 %** | 95.9 % |
-| HRTF-critical SR @ 2 mm | 89.0 % | — |
+| HRTF-critical SR @ 2 mm | 88.7 % | — |
 
 Full architecture, the key findings (≈60 % of the error is *tangential* — landmark
 sliding *along* contours — which a per-region **contour-structured refinement head**

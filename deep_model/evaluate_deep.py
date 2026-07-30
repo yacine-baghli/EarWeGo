@@ -17,7 +17,8 @@ from src.evaluation import LANDMARK_GROUPS, HRTF_CRITICAL_LANDMARKS
 HERE = Path(__file__).resolve().parent
 PROGRESSION = [("classical (test)", 2.65), ("classical (val)", 1.85),
                ("deep DGCNN", 1.50), ("+contour head", 1.375),
-               ("+4-seed ensemble", 1.329), ("+surface proj", 1.309)]
+               ("+4-seed ensemble", 1.329), ("+surface proj", 1.309),
+               ("+dense SSM", 1.294)]
 SCALING = [(1, 1.375), (2, 1.350), (4, 1.329), (6, 1.330)]
 ASYMPTOTE = 1.33          # MEASURED ensemble saturation (4-seed 1.329 == 6-seed 1.330)
 TARGET = 0.5              # organizers' target: <0.5mm "good", <0.2mm "very good"
@@ -75,7 +76,7 @@ def make_figure(dists):
 
     a = ax[0, 0]
     vals = [v for _, v in PROGRESSION]
-    cols = [MUTED, MUTED, "#b9c0c7", "#7fb3d5", BLUE]
+    cols = [MUTED, MUTED, "#b9c0c7", "#9ec6e0", "#5599c6", BLUE]
     a.bar(range(len(vals)), vals, color=cols[:len(vals)], width=0.66, zorder=3)
     a.axhline(TARGET, color="#D55E00", lw=1.4, ls=(0, (4, 3)), zorder=2)
     a.text(len(vals) - 0.5, TARGET + 0.06, "0.5mm target", color="#D55E00",
@@ -85,7 +86,8 @@ def make_figure(dists):
                fontweight="bold" if i == len(vals) - 1 else "normal", fontsize=9)
     short = {"classical (test)": "classical\n(test)", "classical (val)": "classical\n(val)",
              "deep DGCNN": "deep\nDGCNN", "+contour head": "+contour\nhead",
-             "+4-seed ensemble": "+4-seed\nensemble", "+surface proj": "+surface\nproj"}
+             "+4-seed ensemble": "+4-seed\nensemble", "+surface proj": "+surface\nproj",
+             "+dense SSM": "+dense\nSSM"}
     a.set_xticks(range(len(vals)))
     a.set_xticklabels([short.get(n, n) for n, _ in PROGRESSION], fontsize=7.6)
     a.set_ylabel("mean landmark error (mm)"); a.set_ylim(0, 2.9)
