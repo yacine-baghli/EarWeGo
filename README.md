@@ -110,6 +110,32 @@ cannot resolve it — only contour-level context can. Giving each anatomical reg
 own 1-D convolution along the ordered landmarks supplies exactly that, and it also made
 the ensemble seeds decorrelate about twice as effectively.
 
+### Validation protocol and how much to trust these numbers
+
+The headline figures come from a **fixed subject-disjoint split** (140 train / 30 val /
+30 held-out test subjects; both ears of a subject always stay on the same side, and the
+split precedes all augmentation). To check that this split is not flattering, we also ran
+**5-fold cross-validation grouped by subject** (136 train / 34 val subjects per fold),
+which predicts every ear with a model that never saw that subject:
+
+| | single model |
+| --- | ---: |
+| our fixed split | 1.395 mm |
+| **5-fold CV, out-of-fold over 340 ears** | **1.403 mm** |
+| spread across folds | sd **0.056**, range 1.320 – 1.486 |
+
+So the fixed split is **representative, not optimistic** (1.395 vs 1.403). Two
+consequences worth stating plainly:
+
+* **The absolute level carries ≈ ±0.06 mm of split-to-split uncertainty.** Any single
+  reported value should be read with that in mind — which is why the 95 % CI is quoted
+  above.
+* **The stage-by-stage gains are nevertheless real**, because they were measured as
+  *paired* comparisons on identical ears, which is immune to that variance: surface
+  projection improved **100 % of ears** (paired t-test p = 2e-29), and the dense-SSM
+  blend was confirmed by split-half validation (+0.011 mm out-of-sample, positive in
+  100 % of 200 repetitions). Gains smaller than ~0.01 mm are *not* claimed.
+
 ### Implementation details
 
 | | |
