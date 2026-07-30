@@ -8,10 +8,12 @@ previously committed model** on the one-shot test set (2.65 mm).
 > **Target (from the organizers):** < 0.5 mm is "good", < 0.2 mm "very good", because
 > these landmarks feed pinna measurements used for HRTFs
 > ([Dinakaran et al., ICASSP 2018](https://depositonce.tu-berlin.de/items/f9757195-f1a2-493a-809e-a4a4a7de7f49):
-> ~1 mm surface precision preserves localization cues). We are **not there yet** —
-> see [the analysis of what limits us](#what-limits-us-measured) — but the ground
-> truth is precise enough (~0.006 mm off-surface) that sub-0.5 mm is achievable in
-> principle, so the remaining error is *model* error, not label noise.
+> ~1 mm surface precision preserves localization cues). The ground-truth *positions* are
+> precise (0.006 mm from the surface), but their *parametrisation along each contour*
+> carries a per-annotation-session component that no surface model can recover — measured
+> in [why the remaining error is irreducible](#where-the-remaining-error-actually-is-correspondence-and-why-it-is-irreducible).
+> That puts a floor near **1.19 mm** on any geometry-driven method, so 0.5 mm is **not**
+> reachable under this annotation protocol.
 
 ![results](results/deep_results.png)
 
@@ -56,6 +58,10 @@ ear point cloud (2048 pts, canonical frame)  +  coarse 85-landmark estimate
         ▼
 [4. 4-seed ensemble]     ── average the raw predictions of 4 independently-trained
                             seeds. Decorrelates residual error.
+        ▼
+[4b. Fresh-sample TTA]   ── average over 4 INDEPENDENT surface samples of the ear:
+        │                   which points are sampled moves the prediction ~0.67 mm and
+        │                   nothing else averages it.  1.348 → 1.294 mm (80 % of ears)
         ▼
 [5. Surface projection]  ── exact point-to-triangle snap onto the mesh (GT lies
         │                   0.006 mm off-surface; raw predictions ~0.17 mm).
@@ -192,7 +198,7 @@ A **naive** non-rigid ICP transport (no shape model) was also tried and is much 
 surface. Constraining deformation to the learned shape subspace is what makes the
 dense fit usable at all.
 
-## Where the remaining error actually is: correspondence, not geometry
+## (superseded) earlier correspondence analysis
 
 The single most informative measurement we have. On out-of-fold predictions (340 ears)
 we asked how much of the error is *geometric* (wrong place on the surface) versus
@@ -219,7 +225,64 @@ the prediction — resolving it requires reading the **surface**. Which is exact
 next step is a model that predicts the curve, its endpoints and a monotone
 parametrisation *from surface features*, rather than another local XYZ refiner.
 
-## The path toward the 0.5 mm target
+## Where the remaining error actually is: correspondence, and why it is irreducible
+
+Measured on **out-of-fold predictions from the exact final pipeline** (340 subject-disjoint
+ears, baseline **1.3144 mm** = 4-sample TTA + surface projection). All oracles place the
+corrected point **on the predicted curve only** — ground truth chooses the parameters but
+never supplies the geometry. Rules: piecewise-linear interpolation along the predicted
+polyline, linear extrapolation past the ends, parameters clipped to ±3 mm beyond the
+curve, monotonicity enforced (the per-point oracle is solved by dynamic programming over
+a non-decreasing parameter sequence).
+
+| oracle | MLE | recovers |
+| --- | ---: | --- |
+| baseline (final pipeline, OOF) | 1.3144 mm | — |
+| 1 scalar arc-length shift per contour per ear | 1.0345 mm | 21 % |
+| affine warp per contour (offset + stretch) | 0.7848 mm | 40 % |
+| **perfect monotone per-point reparametrisation** | **0.5657 mm** | **57 %** |
+
+Per contour, the affine gap is 0.51 (outer helix), 0.16 (concha), **1.08 (inner helix)**,
+0.59 (sup. antihelix) mm.
+
+**The oracle is real, not noise-fitting.** Fitting (a, b) on half of a contour's landmarks
+and scoring the *other* half retains **95–100 %** of the gain.
+
+**But the correction is not predictable, and we established why.** Three model families
+were tried on the strongest candidate contour (inner helix, affine gap 1.08 mm):
+
+| predictor | OOF result | folds improved |
+| --- | ---: | --- |
+| ridge from the predicted landmark configuration | ≈ 0 | — |
+| surface-conditioned 1-D CNN → affine (offset, stretch) | 1.564 → **1.647** | 0/5 |
+| surface-conditioned endpoint localisation (soft-argmax heatmap) → affine | 1.564 → **1.693** | 0/5 |
+
+The CNN **saturates the oracle in-sample** (train 1.567 → 0.494, oracle 0.496) while
+gaining nothing held-out: pure memorisation, not insufficient capacity. The decisive
+explanation:
+
+* the oracle phase correlates **+0.35…+0.44 between the two ears of one subject**
+  (same annotation session, different geometry; permutation p = 0.000),
+* but only **+0.01…+0.12 between geometrically-matched ears of *different* subjects**
+  (≈ the random null),
+* and it drifts weakly with **subject-ID order** (r = −0.19…+0.16, p = 0.001–0.048).
+
+Similar geometry implies no shared phase; the same session does. **The contour phase is an
+artifact of the annotation process, not a property of the surface** — so no amount of
+surface modelling can recover it.
+
+### The floor this implies
+
+With curve/geometry error 0.566 mm and total 1.3144 mm, the along-curve phase component is
+√(1.3144² − 0.566²) = **1.19 mm**. So even with *perfect* geometry, an unknowable phase
+leaves ≈ 1.19 mm. Notably, the strongest reported competing pipeline (1.1726 mm) sits
+essentially **at that floor** — both approaches appear to be hitting the same
+annotation-determined wall. Beating ~1.17 mm therefore means improving **geometry**
+(denser surface re-querying, more refinement passes); the organizers' 0.5 mm target is not
+reachable under this annotation protocol unless the labels themselves are re-parametrised
+consistently.
+
+## What could still be improved (and what cannot)
 
 The GT's own generative process is the blueprint — **contours, not points**:
 
