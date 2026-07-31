@@ -110,7 +110,7 @@ class Head(nn.Module):
         else:
             w = mask.float()[..., None]
             ctx = torch.cat([(fK * w).sum(2) / w.sum(2).clamp(min=1),
-                             (fK + (mask[..., None] - 1) * 1e4).max(2).values], -1)
+                             fK.masked_fill(~mask[..., None], -1e4).max(2).values], -1)
         eo = self.embO(torch.arange(NL, device=pc.device))[None].expand(pc.shape[0], -1, -1)
         off = self.offset(torch.cat([ctx, eo], -1))
         if self.max_off is not None:
