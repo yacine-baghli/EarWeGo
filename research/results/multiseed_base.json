@@ -1,0 +1,64 @@
+{
+ "seeds": [
+  0,
+  1,
+  2
+ ],
+ "n_ears": 340,
+ "n_bootstrap": 20000,
+ "tags": {
+  "base": {
+   "fold_seed_MLE": [
+    [
+     1.3392,
+     1.3389,
+     1.4048
+    ],
+    [
+     1.2983,
+     1.2649,
+     1.2776
+    ],
+    [
+     1.3971,
+     1.3608,
+     null
+    ],
+    [
+     1.2549,
+     1.2698,
+     null
+    ],
+    [
+     1.3126,
+     1.3084,
+     null
+    ]
+   ],
+   "per_seed_pooled_OOF": [
+    1.3204,
+    1.3086,
+    null
+   ],
+   "per_seed_sd": 0.0084,
+   "seed_ensemble_pooled_OOF": 1.2822,
+   "variance": {
+    "fold_sd": 0.0503,
+    "seed_sd": 0.0165,
+    "resid_sd": 0.0161
+   },
+   "per_contour_MLE_mm": {
+    "outer_helix": 1.3019,
+    "concha": 1.0439,
+    "inner_helix": 1.5661,
+    "sup._antihelix": 1.3796
+   },
+   "directional_rmse_mm": {
+    "tangent_t": 1.409,
+    "across_b": 0.7037,
+    "normal_n": 0.2724
+   },
+   "n_complete_seeds": 2
+  }
+ }
+}
