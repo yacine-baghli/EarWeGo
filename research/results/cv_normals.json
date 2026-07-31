@@ -1,0 +1,77 @@
+{
+ "variant": "normals",
+ "n_ears": 340,
+ "n_subjects": 170,
+ "per_fold_base": {
+  "0": 1.3392,
+  "1": 1.2983,
+  "2": 1.3971,
+  "3": 1.2549,
+  "4": 1.3126
+ },
+ "per_fold_variant": {
+  "0": 1.3123,
+  "1": 1.326,
+  "2": 1.3429,
+  "3": 1.2574,
+  "4": 1.3878
+ },
+ "per_fold_delta": [
+  -0.0269,
+  0.0277,
+  -0.0542,
+  0.0026,
+  0.0752
+ ],
+ "folds_favouring_variant": 2,
+ "pooled_oof_MLE_base": 1.3204,
+ "pooled_oof_MLE_variant": 1.3253,
+ "delta_mm": 0.0049,
+ "ci95": [
+  -0.0232,
+  0.0329
+ ],
+ "p_delta_negative": 0.3665,
+ "per_contour": {
+  "outer_helix": [
+   1.3526,
+   1.3808,
+   0.0283
+  ],
+  "concha": [
+   1.0631,
+   1.0589,
+   -0.0042
+  ],
+  "inner_helix": [
+   1.6123,
+   1.6499,
+   0.0376
+  ],
+  "sup._antihelix": [
+   1.4282,
+   1.3366,
+   -0.0916
+  ]
+ },
+ "directional_rmse": {
+  "tangent_t": [
+   1.4456,
+   1.4855,
+   0.0399
+  ],
+  "across_b": [
+   0.7233,
+   0.7256,
+   0.0023
+  ],
+  "normal_n": [
+   0.2822,
+   0.2728,
+   -0.0093
+  ]
+ },
+ "n_bootstrap": 20000,
+ "verdict": "INDISTINGUISHABLE",
+ "note": "Raw-network OOF, evaluated with 4 fresh samples; no surface projection and no dense-SSM blend, so these are NOT comparable to the shipped 1.273/1.3144 full-pipeline numbers."
+}
