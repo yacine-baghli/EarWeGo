@@ -200,6 +200,7 @@ REGISTRY = {
     "ptv3":        ("fam_ptv3", None),
     "diffusionnet": ("fam_diffusionnet", None),
     "template":    ("fam_template", None),
+    "bilateral":   ("fam_bilateral", None),         # MODE=single|bilateral|bilateral_head
 }
 
 TRAIN_DEFAULTS = dict(lr=1.5e-3, bs=16, wd=5e-4, sub_frac=0.625,
