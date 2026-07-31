@@ -315,8 +315,12 @@ res = {"variant": VARIANT, "seed": SEED, "fold": FOLD, "params": int(NPARAM),
        "train_val_curve": curve,
        "per_ear_MLE": [round(float(x), 5) for x in E.mean(1)],
        "val_ear_index": [int(i) for i in va_idx]}
-json.dump(res, open(f"{WORK}/screen_{VARIANT}_s{SEED}_f{FOLD}.json", "w"), indent=1)
-np.save(f"{WORK}/screen_{VARIANT}_s{SEED}_f{FOLD}.npy", Pv)
-print(f"\n[{VARIANT} s{SEED} f{FOLD}] ordered MLE {E.mean():.4f} | per-contour "
+# VARIANT selects the config; OUTTAG names the artefact. They differ when the same
+# config is re-run against corrected inputs and the old artefacts must stay separable.
+OUTTAG = os.environ.get("OUTTAG", VARIANT)
+res["outtag"] = OUTTAG
+json.dump(res, open(f"{WORK}/screen_{OUTTAG}_s{SEED}_f{FOLD}.json", "w"), indent=1)
+np.save(f"{WORK}/screen_{OUTTAG}_s{SEED}_f{FOLD}.npy", Pv)
+print(f"\n[{OUTTAG} s{SEED} f{FOLD}] ordered MLE {E.mean():.4f} | per-contour "
       + "/".join(f"{E[:, lo:hi+1].mean():.3f}" for lo, hi in CONTOURS)
       + f" | sampvar {var:.4f} | {NPARAM/1e3:.0f}k params | {time.time()-t0:.0f}s", flush=True)
