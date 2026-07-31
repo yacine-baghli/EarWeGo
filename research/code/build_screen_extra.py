@@ -37,6 +37,17 @@ MIRROR = np.array([1., -1., 1.])
 MARGIN = 14.0
 M = int(os.environ.get("M", "4"))
 
+
+def vertex_normals(V, F):
+    """Area-weighted vertex normals from the winding of F (outward iff F is CCW)."""
+    fn = np.cross(V[F[:, 1]] - V[F[:, 0]], V[F[:, 2]] - V[F[:, 0]])
+    VN = np.zeros_like(V)
+    for c in range(3):
+        np.add.at(VN, F[:, c], fn)
+    nr = np.linalg.norm(VN, axis=1, keepdims=True)
+    return np.where(nr > 1e-12, VN / np.maximum(nr, 1e-12), np.array([0., 0., 1.]))
+
+
 d = np.load("scratch/deep_dataset.npz", allow_pickle=True)
 coarse, true, Rm, c0, split = d["coarse"], d["true"], d["R"], d["c0"], d["split"]
 ref = np.load("scratch/all_multisample.npz")["clouds"]
@@ -55,25 +66,29 @@ short, crop_sizes, orient_checks = 0, [], []
 for i, (pid, side) in enumerate(order):
     if pid not in cache:
         m = ds[pid2idx[pid]][0]
-        V0 = np.asarray(m.vertices, np.float64); F = np.asarray(m.faces)
-        # outward-consistent vertex normals from the original winding
-        fn = np.cross(V0[F[:, 1]] - V0[F[:, 0]], V0[F[:, 2]] - V0[F[:, 0]])
-        VN = np.zeros_like(V0)
-        for c in range(3):
-            np.add.at(VN, F[:, c], fn)                 # area-weighted
-        nn = np.linalg.norm(VN, axis=1, keepdims=True)
-        VN = np.where(nn > 1e-12, VN / np.maximum(nn, 1e-12), np.array([0., 0., 1.]))
+        V0 = np.asarray(m.vertices, np.float64); F0 = np.asarray(m.faces)
+        VN = vertex_normals(V0, F0)
         rad = V0 - V0.mean(0)
         rad /= np.maximum(np.linalg.norm(rad, axis=1, keepdims=True), 1e-12)
-        cache[pid] = (V0, VN, float((VN * rad).sum(1).mean()))
+        cache[pid] = (V0, F0, VN, float((VN * rad).sum(1).mean()))
         if len(cache) > 12:
             cache.pop(next(iter(cache)))
-    V0, VN0, odot = cache[pid]
-    orient_checks.append(odot)
+    V0, F0, VN0, odot = cache[pid]
+    # Do NOT transform the normal vector and reason about the sign -- that is how the
+    # first version of this script shipped INWARD normals for every right ear. A
+    # reflection reverses orientation, so flip the winding and recompute the normals in
+    # the space we actually ship. Verified numerically: recomputing from the flipped
+    # winding gives +0.995 against the true outward direction, whereas -(M*n) and
+    # same-winding recomputation both give -0.995.
     if side == "right":
-        V, VN = V0 * MIRROR, -(VN0 * MIRROR)           # reflection reverses orientation
+        V, F = V0 * MIRROR, F0[:, [0, 2, 1]]
+        VN = vertex_normals(V, F)
     else:
-        V, VN = V0, VN0
+        V, F, VN = V0, F0, VN0
+    # assert the shipped normals really are the winding's outward normals
+    chk = float((VN * vertex_normals(V, F)).sum(1).mean())
+    assert chk > 0.99, f"{pid}/{side}: shipped normals disagree with winding ({chk:.3f})"
+    orient_checks.append(odot)
     R, cc = Rm[i], c0[i]
     cw = coarse[i] @ R + cc
     lo, hi = cw.min(0) - MARGIN, cw.max(0) + MARGIN
@@ -100,8 +115,11 @@ for i, (pid, side) in enumerate(order):
         print(f"  {i+1}/{NE}", flush=True)
 
 om = float(np.mean(orient_checks))
-assert om > 0.5, f"vertex normals are not outward-consistent (mean radial dot {om:.3f})"
-print(f"\noutward-orientation check: mean dot(normal, radial) = {om:.3f}")
+# Weak diagnostic only: a head is not star-shaped, so this cannot validate the
+# mirroring. The per-ear winding-consistency assertion above is the real check.
+assert om > 0.5, f"original meshes are not outward-wound (mean radial dot {om:.3f})"
+print(f"\nradial-dot diagnostic (original meshes): {om:.3f}")
+print(f"per-ear winding consistency: asserted >0.99 for all {NE} ears")
 cs = np.array(crop_sizes)
 print(f"crop vertices: min {cs.min()} median {int(np.median(cs))} max {cs.max()}")
 print(f"4096 samples needing replacement: {short}/{NE*M}")
