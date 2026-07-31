@@ -613,12 +613,18 @@ def run():
     print(f"    valid eigenpairs {P['n_eig'].min()}..{P['n_eig'].max()} of {K_EIG}; "
           f"shift eps escalated on {int((P['eig_eps'] > EIG_EPS).sum())} ears")
     print("\n--- ASSERTIONS (all passed) ---")
-    print(f"  outward normals, mean dot(n, radial)         min {P['radial'].min():.4f}  (> 0.5)")
+    # The radial dot is a DIAGNOSTIC, not a bound: a head is not star-shaped, so per-ear
+    # values legitimately fall well below 0.5 (min 0.288 over 340 ears). Orientation is
+    # asserted by the divergence theorem upstream and by the winding/normal agreement below.
+    print(f"  outward normals, mean dot(n, radial)         min {P['radial'].min():.4f}  "
+          f"(diagnostic only -- orientation is asserted by signed volume)")
     print(f"  submesh winding vs normals, mean dot         min {P['wind'].min():.4f}  (> 0.5)")
     print(f"  ... fraction of faces agreeing               min {P['wind_frac'].min():.4f}")
     print(f"  tangent frame orthogonality                  < 1e-9 every ear")
     print(f"  grad least-squares determinant              > 0 every vertex")
-    print(f"  lumped mass strictly positive                min {min(1e9, 1e9):.0f} -> see below")
+    _mass_min = float(out["mass"].min())
+    assert _mass_min > 0, f"lumped mass has a non-positive entry ({_mass_min:.3e})"
+    print(f"  lumped mass strictly positive                min {_mass_min:.3e}  (> 0)")
     print(f"  min generalised eigenvalue (L PSD)           {P['raw_min'].min():.3e}  (> -1e-6)")
     print(f"  M-orthonormality error of evecs              max {P['orth'].max():.3e}  (< 1e-6)")
     print(f"  relative generalised residual               max {P['resid'].max():.3e}  (< 1e-6)")
