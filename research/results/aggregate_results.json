@@ -1,0 +1,76 @@
+{
+ "baseline_oof_final_pipeline": {
+  "tag": "OOF: 4-sample TTA + surface projection",
+  "n_ears": 340,
+  "ordered_MLE_mm": 1.3144,
+  "median_mm": 1.0714,
+  "RMSE_mm": 1.6407,
+  "P90_mm": 2.5424,
+  "P95_mm": 3.1731,
+  "per_contour_MLE_mm": {
+   "outer_helix": 1.3682,
+   "concha": 1.0738,
+   "inner_helix": 1.5642,
+   "sup_antihelix": 1.4018
+  }
+ },
+ "ortho_proxy_loss": {
+  "error": "[Errno 2] No such file or directory: 'scratch/ortho_out_proxy.npy'"
+ },
+ "ortho_metric_loss": {
+  "tag": "ortho_metric_loss",
+  "n_ears": 340,
+  "ordered_MLE_mm": 1.3569,
+  "median_mm": 1.1257,
+  "RMSE_mm": 1.6773,
+  "P90_mm": 2.5843,
+  "P95_mm": 3.2305,
+  "per_contour_MLE_mm": {
+   "outer_helix": 1.4212,
+   "concha": 1.1057,
+   "inner_helix": 1.5864,
+   "sup_antihelix": 1.4906
+  }
+ },
+ "ortho_first_run": {
+  "tag": "ortho_first_run",
+  "n_ears": 340,
+  "ordered_MLE_mm": 1.355,
+  "median_mm": 1.1216,
+  "RMSE_mm": 1.6758,
+  "P90_mm": 2.5854,
+  "P95_mm": 3.2253,
+  "per_contour_MLE_mm": {
+   "outer_helix": 1.4258,
+   "concha": 1.0945,
+   "inner_helix": 1.5881,
+   "sup_antihelix": 1.4934
+  }
+ },
+ "directional_decomposition": {
+  "note": "orthonormal frame (t,b,n); shares are DIRECTIONAL ENERGY shares of the error, not causal attributions",
+  "total_RMSE_mm": 1.6407,
+  "along_t": {
+   "RMSE_mm": 1.4465,
+   "energy_share": 0.7772
+  },
+  "across_b": {
+   "RMSE_mm": 0.7374,
+   "energy_share": 0.202
+  },
+  "normal_n": {
+   "RMSE_mm": 0.2366,
+   "energy_share": 0.0208
+  }
+ },
+ "oracle_displacement_identity": {
+  "e_base_sq": 2.6919,
+  "e_oracle_sq": 0.5793,
+  "d_sq": 2.0918,
+  "cross_term": -0.0104,
+  "identity_residual": 0.0,
+  "normalised_cross_term": -0.0095,
+  "mean_abs_d_mm": 1.0574,
+  "note": "cross-term MEASURED; no orthogonality assumed. mean|d| is NOT a proven floor."
+ }
+}

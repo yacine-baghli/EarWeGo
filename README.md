@@ -177,11 +177,13 @@ local frame the energy splits **77.7 % along-contour**, 20.2 % across-contour, 2
 normal — so the dominant term is *correspondence* (position **along** the curve), not
 surface localisation. An oracle that only reparametrises our own predicted curve reaches
 0.566 mm, and that gain is real (95–100 % transfers to held-out landmarks). But the phase
-is **not predictable from the surface**: it correlates +0.35…+0.44 between a subject's two
-ears (same annotation session, different geometry) yet ≈0 between geometry-matched ears of
-different subjects — it is an annotation-process artifact. Full derivation, the exact
+is **not predictable from the surface** by any of five model families we tried: the per-ear
+offsets correlate +0.35…+0.44 between a subject's two ears yet ≈0 between geometry-matched
+ears of *different* subjects, i.e. they carry a shared per-subject factor unexplained by ear
+geometry. (Subject, scan, preprocessing and annotation session are confounded here, so we do
+not claim the component is purely an annotation artifact.) Full derivation, the exact
 cross-term, and an explicit retraction of an earlier invalid "floor" estimate are in
-[`deep_model/README.md`](deep_model/README.md#where-the-remaining-error-actually-is-correspondence-and-why-it-is-irreducible).
+[`deep_model/README.md`](deep_model/README.md#where-the-remaining-error-lives-and-what-we-could-not-predict).
 
 <details>
 <summary><b>Classical baseline — Dense V4 (1.8738 mm)</b></summary>

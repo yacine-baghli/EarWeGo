@@ -11,10 +11,10 @@ previously committed model** on the one-shot test set (2.65 mm).
 > ~1 mm surface precision preserves localization cues). The ground-truth *positions* are
 > precise (0.006 mm from the surface), but their *parametrisation along each contour*
 > carries a per-annotation-session component that no surface model can recover — measured
-> in [why the remaining error is irreducible](#where-the-remaining-error-actually-is-correspondence-and-why-it-is-irreducible).
-> Under the (stated, falsifiable) assumption that this phase is unpredictable, a
-> geometry-perfect method would still score ≈ **1.06 mm**; treat that as a hypothesis,
-> not a proven bound.
+> in [where the remaining error lives](#where-the-remaining-error-lives-and-what-we-could-not-predict).
+> Under the (stated, falsifiable) assumption that this component is unpredictable, a
+> geometry-perfect method would still score ≈ **1.06 mm** on this metric. That is a
+> **hypothesis, not a bound** — see the section below for its assumptions.
 
 ![results](results/deep_results.png)
 
@@ -199,34 +199,7 @@ A **naive** non-rigid ICP transport (no shape model) was also tried and is much 
 surface. Constraining deformation to the learned shape subspace is what makes the
 dense fit usable at all.
 
-## (superseded) earlier correspondence analysis
-
-The single most informative measurement we have. On out-of-fold predictions (340 ears)
-we asked how much of the error is *geometric* (wrong place on the surface) versus
-*parametrisation* (right curve, wrong position **along** it — which the ordered metric
-still punishes). Oracles that use the ground truth only to reparametrise our **own**
-predicted curve:
-
-| oracle (OOF, 340 ears) | MLE | interpretation |
-| --- | ---: | --- |
-| baseline | 1.403 mm | — |
-| **1 scalar arc-length shift per contour per ear** | 1.134 mm | 4 numbers/ear recover **19 %** |
-| **affine warp of the parameter per contour** (offset + stretch) | 0.911 mm | 8 numbers/ear recover **35 %** |
-| **perfect per-point parametrisation** (slide each point freely along the GT curve) | **0.684 mm** | **51 % of our error is correspondence, not geometry** |
-
-So our geometry is already good enough for ~0.68 mm: the model finds the right
-anatomical curve but not the annotation convention's position along it. The correction is
-strikingly low-dimensional — 8 numbers per ear buy 0.49 mm.
-
-**But it is not predictable from the prediction alone.** Regressing those oracle
-parameters from the predicted landmark configuration (ridge, subject-grouped 5-fold CV)
-recovers **−3 %**, i.e. nothing; oracle-vs-predicted correlations are only 0.18–0.30.
-That is consistent: if a whole contour is phase-shifted, the shift is invisible *within*
-the prediction — resolving it requires reading the **surface**. Which is exactly why the
-next step is a model that predicts the curve, its endpoints and a monotone
-parametrisation *from surface features*, rather than another local XYZ refiner.
-
-## Where the remaining error actually is: correspondence, and why it is irreducible
+## Where the remaining error lives, and what we could not predict
 
 Measured on **out-of-fold predictions from the exact final pipeline** (340 subject-disjoint
 ears, baseline **1.3144 mm** = 4-sample TTA + surface projection). All oracles place the
@@ -336,12 +309,20 @@ The reason is the same as for phase: **the across-contour error is also session-
 | inner helix | +0.558 | −0.043 | 0.268 mm |
 | sup. antihelix | +0.451 | −0.086 | 0.646 mm |
 
-Together with the phase result this accounts for **77.7 % + 20.2 % ≈ 98 % of the error
-energy**; only the 2.1 % surface-normal component is genuinely geometric, and the exact
-point-to-triangle projection already exploits it. **Five model families have now failed
-in the same way** (ridge on predicted landmarks; surface-conditioned CNN → affine;
-endpoint-localisation heatmap; orthogonal corrector under two objectives): each fits its
-training ears and gains nothing out-of-fold.
+**How far this generalises — stated carefully.** 77.7 % and 20.2 % are *directional
+energy shares* of the error (along- and across-contour). The left/right correlations show
+that both directions carry a **shared per-subject factor**, and that this factor is not
+explained by ear geometry. They do **not** establish that those directional components are
+*entirely* an annotation artifact: with only one paired observation per subject,
+**subject, scan session, preprocessing and annotation session are mutually confounded**.
+A shared scan/alignment effect would produce the same signature. Distinguishing them needs
+either repeat annotations, or features that separate scan/alignment from annotation — which
+is what the full-head/bilateral context probe is for.
+
+What is established: **five model families have failed in the same way** (ridge on
+predicted landmarks; surface-conditioned CNN → affine; endpoint-localisation heatmap;
+orthogonal corrector under two objectives) — each fits its training ears and gains nothing
+out-of-fold — and the per-ear offsets they would need are uncorrelated with ear geometry.
 
 ### Cheap inference ablations (all rejected)
 

@@ -1,0 +1,59 @@
+{
+ "note": "Left/right correlations of the per-ear oracle corrections, against a GEOMETRY-MATCHED different-subject null. CAVEAT: with one paired observation per subject, subject / scan session / preprocessing / annotation session are mutually confounded; a shared scan or alignment effect produces the same signature. These numbers show a shared per-subject factor unexplained by ear geometry -- they do NOT isolate annotation as the cause.",
+ "phase_affine_correlations": {
+  "outer_helix": {
+   "offset_within_subject_r": 0.3517,
+   "offset_geometry_matched_r": -0.037,
+   "offset_random_null_mean_r": 0.0003,
+   "stretch_within_subject_r": 0.517,
+   "stretch_geometry_matched_r": -0.1908,
+   "mean_abs_offset_mm": 1.1881
+  },
+  "concha": {
+   "offset_within_subject_r": 0.3527,
+   "offset_geometry_matched_r": 0.1203,
+   "offset_random_null_mean_r": 0.0008,
+   "stretch_within_subject_r": 0.4169,
+   "stretch_geometry_matched_r": 0.0149,
+   "mean_abs_offset_mm": 0.841
+  },
+  "inner_helix": {
+   "offset_within_subject_r": 0.3493,
+   "offset_geometry_matched_r": 0.0143,
+   "offset_random_null_mean_r": 0.0029,
+   "stretch_within_subject_r": 0.3949,
+   "stretch_geometry_matched_r": 0.0871,
+   "mean_abs_offset_mm": 1.1847
+  },
+  "sup._antihelix": {
+   "offset_within_subject_r": 0.4367,
+   "offset_geometry_matched_r": -0.0341,
+   "offset_random_null_mean_r": -0.0018,
+   "stretch_within_subject_r": 0.4069,
+   "stretch_geometry_matched_r": -0.0127,
+   "mean_abs_offset_mm": 1.2349
+  }
+ },
+ "across_contour_correlations": {
+  "outer_helix": {
+   "within_subject_r": 0.5477,
+   "geometry_matched_r": -0.1099,
+   "mean_abs_offset_mm": 0.3096
+  },
+  "concha": {
+   "within_subject_r": 0.5201,
+   "geometry_matched_r": -0.0968,
+   "mean_abs_offset_mm": 0.2768
+  },
+  "inner_helix": {
+   "within_subject_r": 0.5577,
+   "geometry_matched_r": -0.0431,
+   "mean_abs_offset_mm": 0.2675
+  },
+  "sup._antihelix": {
+   "within_subject_r": 0.4505,
+   "geometry_matched_r": -0.0859,
+   "mean_abs_offset_mm": 0.6462
+  }
+ }
+}
