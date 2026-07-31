@@ -324,6 +324,35 @@ predicted landmarks; surface-conditioned CNN → affine; endpoint-localisation h
 orthogonal corrector under two objectives) — each fits its training ears and gains nothing
 out-of-fold — and the per-ear offsets they would need are uncorrelated with ear geometry.
 
+### Full-head / bilateral context probe — is the shared factor scan/alignment or annotation?
+
+The left/right correlations cannot separate subject, scan session, preprocessing and
+annotation session (one paired observation per subject). If the shared factor were a
+**scan or alignment** effect it should be predictable from observable global context. So we
+built 121 features per ear — head bounding box and PCA axis lengths, vertex/face counts,
+edge-length statistics, per-ear crop density and nearest-neighbour spacing, coarse→SSM-mean
+Procrustes scale / rotation angle / residual, crop extent and frame orientation, left/right
+coarse asymmetry, and **both** ears' coarse shape embeddings — deliberately excluding
+subject ID — and regressed the oracle corrections under the frozen subject-grouped folds.
+
+| target family | out-of-fold R² (ridge) | out-of-fold R² (gradient boosting) |
+| --- | ---: | ---: |
+| per-contour phase offset | −0.084 … −0.015 | −0.280 … −0.062 |
+| per-contour phase stretch | −0.143 … −0.024 | −0.179 … −0.102 |
+| per-contour across-contour offset | −0.080 … −0.018 | −0.198 … −0.031 |
+
+**Max R² over all twelve targets: −0.015** — every model is worse than predicting the mean.
+Two conclusions, of different strengths:
+
+* **Firm and practical:** there is **no exploitable scan/alignment signal** in observable
+  global context, and bilateral context does not help either — even the partner ear's
+  geometry carries nothing about a given ear's correction.
+* **Weaker:** this is *consistent with* an annotation-session factor, but it does not prove
+  one. It rules out the scan/alignment alternative being usable, not its existence.
+
+Counting this probe, **six** independent feature families / model classes have now failed
+to predict the per-ear corrections out-of-fold.
+
 ### Cheap inference ablations (all rejected)
 
 On OOF predictions (baseline 1.3355): area-weighted triangle sampler 1.4015; K = 32/64/96

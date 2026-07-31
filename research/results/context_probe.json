@@ -1,0 +1,92 @@
+{
+ "note": "Do observable global head / mesh-quality / crop / alignment / bilateral features predict the oracle corrections? Subject-grouped 5-fold CV, no subject ID. Signal => the shared per-subject factor is at least partly a SCAN/ALIGNMENT effect (and exploitable). No signal => consistent with an annotation-only factor, though it cannot prove it.",
+ "n_features": 121,
+ "targets": {
+  "outer_helix/offset": {
+   "sd": 1.4633,
+   "ridge_R2_oof": -0.0837,
+   "gbm_R2_oof": -0.2802,
+   "corr_ridge": -0.2317,
+   "verdict": "none"
+  },
+  "outer_helix/stretch": {
+   "sd": 0.0256,
+   "ridge_R2_oof": -0.0508,
+   "gbm_R2_oof": -0.1405,
+   "corr_ridge": -0.2093,
+   "verdict": "none"
+  },
+  "outer_helix/across": {
+   "sd": 0.3948,
+   "ridge_R2_oof": -0.0178,
+   "gbm_R2_oof": -0.0309,
+   "corr_ridge": 0.0917,
+   "verdict": "none"
+  },
+  "concha/offset": {
+   "sd": 1.0681,
+   "ridge_R2_oof": -0.0149,
+   "gbm_R2_oof": -0.1057,
+   "corr_ridge": -0.1079,
+   "verdict": "none"
+  },
+  "concha/stretch": {
+   "sd": 0.0168,
+   "ridge_R2_oof": -0.0242,
+   "gbm_R2_oof": -0.1688,
+   "corr_ridge": -0.0501,
+   "verdict": "none"
+  },
+  "concha/across": {
+   "sd": 0.357,
+   "ridge_R2_oof": -0.0794,
+   "gbm_R2_oof": -0.1583,
+   "corr_ridge": -0.1207,
+   "verdict": "none"
+  },
+  "inner_helix/offset": {
+   "sd": 1.4116,
+   "ridge_R2_oof": -0.03,
+   "gbm_R2_oof": -0.0616,
+   "corr_ridge": 0.0462,
+   "verdict": "none"
+  },
+  "inner_helix/stretch": {
+   "sd": 0.0771,
+   "ridge_R2_oof": -0.143,
+   "gbm_R2_oof": -0.1793,
+   "corr_ridge": -0.1533,
+   "verdict": "none"
+  },
+  "inner_helix/across": {
+   "sd": 0.3596,
+   "ridge_R2_oof": -0.0802,
+   "gbm_R2_oof": -0.1978,
+   "corr_ridge": 0.0809,
+   "verdict": "none"
+  },
+  "sup._antihelix/offset": {
+   "sd": 1.5149,
+   "ridge_R2_oof": -0.0201,
+   "gbm_R2_oof": -0.1872,
+   "corr_ridge": -0.0972,
+   "verdict": "none"
+  },
+  "sup._antihelix/stretch": {
+   "sd": 0.1118,
+   "ridge_R2_oof": -0.0615,
+   "gbm_R2_oof": -0.1021,
+   "corr_ridge": -0.1177,
+   "verdict": "none"
+  },
+  "sup._antihelix/across": {
+   "sd": 0.8378,
+   "ridge_R2_oof": -0.0484,
+   "gbm_R2_oof": -0.1854,
+   "corr_ridge": -0.2107,
+   "verdict": "none"
+  }
+ },
+ "max_R2_across_targets": -0.0149,
+ "conclusion": "no exploitable scan/alignment signal found in these features"
+}
