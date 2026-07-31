@@ -1,0 +1,31 @@
+{
+ "tag": "normalsfix",
+ "seeds": [
+  0,
+  1,
+  2
+ ],
+ "n_ears": 340,
+ "ssm_alpha": 0.3,
+ "ssm_kuse": 120,
+ "stages_mm": {
+  "single_seed_mean": 1.2696,
+  "seed_ensemble": 1.2292,
+  "plus_surface_projection": 1.2189,
+  "plus_dense_ssm_blend": 1.2208
+ },
+ "final_per_contour_mm": {
+  "outer_helix": 1.2954,
+  "concha": 0.9607,
+  "inner_helix": 1.5142,
+  "sup._antihelix": 1.2279
+ },
+ "vs_seed0_raw": {
+  "delta_mm": -0.0477,
+  "ci95": [
+   -0.0587,
+   -0.0368
+  ]
+ },
+ "note": "dense-SSM basis is rebuilt per fold from that fold's TRAINING ears only (build_template.py), so it never saw the ears it scores. The shipped deep_model/dense_ssm.npz is NOT used -- it was fitted over all 280 original-train ears, which include CV validation ears."
+}
