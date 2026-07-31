@@ -37,6 +37,11 @@ MARGIN = 14.0
 NPTS = int(os.environ.get("NPTS", "8192"))
 M = int(os.environ.get("M", "4"))
 LIMIT = int(os.environ.get("LIMIT", "0"))
+# Shard so a killed run costs one shard, not the whole build. The first attempt died
+# silently at ~160/340 with an empty stderr (external termination, not a traceback), and
+# losing 40 minutes of work to that is avoidable. Shards merge with SHARD=merge.
+SHARD = os.environ.get("SHARD", "")
+NSHARD = int(os.environ.get("NSHARD", "4"))
 
 
 def vertex_normals(V, F):
@@ -57,11 +62,33 @@ assert len(order) == len(split)
 ds = Dataset(MESH, LM); pid2idx = {p: i for i, p in enumerate(ds.subject_ids)}
 NE = LIMIT if LIMIT else len(order)
 
-cl = np.zeros((NE, M, NPTS, 3), np.float32)
-nr = np.zeros((NE, M, NPTS, 3), np.float32)
+if SHARD == "merge":                     # stitch the shards into the final file
+    cl = np.zeros((NE, M, NPTS, 3), np.float32)
+    nr = np.zeros((NE, M, NPTS, 3), np.float32)
+    seen = np.zeros(NE, bool)
+    for k in range(NSHARD):
+        p = f"scratch/_hires{NPTS}_sh{k}.npz"
+        assert os.path.exists(p), f"shard {k} missing -- run SHARD={k} first"
+        z = np.load(p)
+        idx = z["idx"]
+        cl[idx] = z["clouds"]; nr[idx] = z["nrm"]; seen[idx] = True
+    assert seen.all(), f"{(~seen).sum()} ears missing after merge"
+    out = f"scratch/screen_data_{NPTS}nrm.npz"
+    np.savez_compressed(out, clouds=cl, nrm=nr, coarse=coarse[:NE], true=true[:NE],
+                        R=Rm[:NE], c0=c0[:NE], split=split[:NE])
+    nl = np.linalg.norm(nr.reshape(-1, 3), axis=1)
+    print(f"merged {NSHARD} shards -> {out} ({os.path.getsize(out)/1e6:.1f} MB) "
+          f"clouds {cl.shape} | normal norm {nl.min():.4f}..{nl.max():.4f}")
+    sys.exit(0)
+
+RANGE = range(NE) if SHARD == "" else range(int(SHARD), NE, NSHARD)
+
+IDX = np.array(list(RANGE))
+cl = np.zeros((len(IDX), M, NPTS, 3), np.float32)
+nr = np.zeros((len(IDX), M, NPTS, 3), np.float32)
 cache = {}
 areas, nface, spacing = [], [], []
-for i in range(NE):
+for slot, i in enumerate(IDX):
     pid, side = order[i]
     if pid not in cache:
         m = ds[pid2idx[pid]][0]
@@ -99,12 +126,12 @@ for i in range(NE):
         u[flip], v[flip] = 1.0 - u[flip], 1.0 - v[flip]
         w = np.stack([1.0 - u - v, u, v], 1)[:, :, None]
         tri = Fs[f]
-        cl[i, j] = (w * Vc[tri]).sum(1).astype(np.float32)
+        cl[slot, j] = (w * Vc[tri]).sum(1).astype(np.float32)
         n = (w * Nc[tri]).sum(1)
         n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-12)
-        nr[i, j] = n.astype(np.float32)
-    if (i + 1) % 40 == 0:
-        print(f"  {i+1}/{NE}", flush=True)
+        nr[slot, j] = n.astype(np.float32)
+    if (slot + 1) % 20 == 0:
+        print(f"  {slot+1}/{len(IDX)} (ear {i})", flush=True)
 
 sp = np.array(spacing)
 print(f"\ncrop faces  min {min(nface)} median {int(np.median(nface))} max {max(nface)}")
@@ -115,8 +142,13 @@ nl = np.linalg.norm(nr.reshape(-1, 3), axis=1)
 print(f"normal unit-norm: min {nl.min():.4f} max {nl.max():.4f}")
 assert abs(nl.min() - 1) < 1e-3 and abs(nl.max() - 1) < 1e-3
 
-out = f"scratch/screen_data_{NPTS}nrm.npz" if not LIMIT else \
-      f"scratch/screen_data_{NPTS}nrm_lim{LIMIT}.npz"
-np.savez_compressed(out, clouds=cl, nrm=nr, coarse=coarse[:NE], true=true[:NE],
-                    R=Rm[:NE], c0=c0[:NE], split=split[:NE])
+if SHARD == "":
+    out = f"scratch/screen_data_{NPTS}nrm.npz" if not LIMIT else \
+          f"scratch/screen_data_{NPTS}nrm_lim{LIMIT}.npz"
+    np.savez_compressed(out, clouds=cl, nrm=nr, coarse=coarse[:NE], true=true[:NE],
+                        R=Rm[:NE], c0=c0[:NE], split=split[:NE])
+else:
+    # a shard stores only its own ears plus the index map; SHARD=merge stitches them
+    out = f"scratch/_hires{NPTS}_sh{SHARD}.npz"
+    np.savez_compressed(out, clouds=cl, nrm=nr, idx=IDX)
 print(f"wrote {out} ({os.path.getsize(out)/1e6:.1f} MB)  clouds {cl.shape}")
