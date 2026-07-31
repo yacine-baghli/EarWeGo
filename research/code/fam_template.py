@@ -592,6 +592,14 @@ class MODEL(nn.Module):
         self.register_buffer("corr_row", torch.tensor(row), persistent=False)
         self.register_buffer("corr", torch.tensor(np.asarray(z["corr_V"])).float(),
                              persistent=False)
+        # build_template.py damps (does not solve) vertices whose match exceeds MAX_DIST,
+        # so their correspondence is EXTRAPOLATED. valid_frac records how many training
+        # ears actually matched each vertex. Measured on fold 0: 6.14% of vertices have
+        # valid_frac < 0.9 yet carry 21.2% of an unweighted sum-of-squares, so a plain
+        # mean spends a fifth of the correspondence gradient on invented targets.
+        vf = torch.tensor(np.asarray(z["valid_frac"]) if "valid_frac" in z
+                          else np.ones(len(z["template_V"]), np.float32)).float().clamp(min=0.0)
+        self.register_buffer("corr_w", (vf / vf.mean()).clamp(max=2.0), persistent=False)
 
     def forward(self, b):
         out = self.net(b["pc"], b["nrm"] if self.use_nrm else None)
@@ -605,8 +613,9 @@ class MODEL(nn.Module):
         m = r >= 0
         if bool(m.any()) and (self.w_corr or self.w_basis):
             t = self.corr[r[m]]
-            L = L + self.w_corr * ((out["Vd"][m] - t) ** 2).sum(-1).mean() \
-                  + self.w_basis * ((out["Vb"][m] - t) ** 2).sum(-1).mean()
+            w = self.corr_w[None, :]                       # per-vertex support weight
+            L = L + self.w_corr * (w * ((out["Vd"][m] - t) ** 2).sum(-1)).mean() \
+                  + self.w_basis * (w * ((out["Vb"][m] - t) ** 2).sum(-1)).mean()
         return L
 
 
@@ -668,7 +677,13 @@ def _smoke():
                bary_w=bwt.astype(np.float32), nbr=nbr, nbr_w=nbw, nbr_mask=nbm,
                edges=E.astype(np.int32), ctrl_idx=ctrl.astype(np.int32),
                skin_idx=ski, skin_w=skw, comps=Cm.astype(np.float32),
-               eig=np.float32([9.0, 4.0, 2.0, 1.0]))
+               eig=np.float32([9.0, 4.0, 2.0, 1.0]),
+               # mimic the real support profile (fold 0: ~8.6% of vertices below 1.0,
+               # min 0.456) so the weighted correspondence loss is actually exercised
+               # rather than reduced to a uniform no-op by an all-ones fixture
+               valid_frac=np.where(np.random.RandomState(0).rand(len(V)) < 0.09,
+                                   0.45 + 0.5 * np.random.RandomState(1).rand(len(V)),
+                                   1.0).astype(np.float32))
     tpl = template_pack(art, 4, FOLD)
     corr_t = torch.tensor(np.stack(warp)).float()
     lm_t = transport(corr_t, tpl["tri"], tpl["bw"])
