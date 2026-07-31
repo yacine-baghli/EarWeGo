@@ -80,6 +80,37 @@ bash research/code/run_ablate.sh    # sampler x GK x K x temperature, on OOF
 temperature (`TEMP`) at inference only, and saves **per-sample** predictions so aggregation
 rules (mean / coordinate-median / geometric-median / trimmed) can be compared offline.
 
+## Base-model screening (one representative fold, one change per run)
+
+```bash
+python research/code/build_screen_data.py    # -> screen_data_2048.npz (repack; data unchanged)
+bash   research/code/run_screen.sh           # base s0, base s1, untied4, untied6, fusion2
+python research/code/screen_compare.py       # -> results/screening.json + decision table
+```
+
+`gpu_screen.py` takes `VARIANT` / `SEED` / `FOLD` / `EPOCHS` from the environment and
+writes one JSON report plus its validation predictions per run. Variants:
+
+| variant | single change vs `base` |
+| --- | --- |
+| `base` | none — the shipped architecture (813,232 params), run twice to measure training noise |
+| `untied4` | the 4 refinement passes stop sharing weights |
+| `untied6` | 6 untied coarse-to-fine passes, fixed-radius neighbourhoods 11→3 mm, per-pass offset bounds 7→0.7 mm |
+| `pts4096` | 4096 points, with `K`/`GK` rescaled to hold the physical window (96 / 40) |
+| `normals` | XYZ plus consistently oriented triangle-derived normals |
+| `fusion2` | two independent surface samples fused per forward pass, with a consistency term |
+| `chamfer` | ordered loss plus a per-contour curve-Chamfer term |
+
+`K`/`GK` are **not** held fixed when the point count changes: at 2048 points the spacing is
+0.995 mm, so `K=48` is a 7.35 mm window and `GK=20` a 4.94 mm graph. Keeping them fixed at
+4096 points shrinks both windows by √2, which is why the earlier 8192-point test was
+confounded and is not treated as decisive.
+
+`screen_compare.py` refuses to rank variants until both `base` seeds exist, then requires a
+variant to beat the seed-to-seed delta **and** have a paired per-subject bootstrap interval
+excluding zero. Only the best one or two go to 5-fold CV. Intervals from one fold cover
+val-ear sampling, not fold choice.
+
 ## Results
 
 | file | contents |
