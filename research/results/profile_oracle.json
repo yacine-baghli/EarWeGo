@@ -1,0 +1,404 @@
+{
+ "prediction_source": {
+  "key": "proj",
+  "note": "equal-weight OOF ensemble of dgcnn3+kpconv+ptv3 + exact surface projection [cached scratch/ensemble3_proj.npy]",
+  "all85_mm": 1.1897
+ },
+ "n_ears": 340,
+ "n_folds": 5,
+ "kmax": 6,
+ "anchor_alignment": "similarity (rotation+uniform scale)",
+ "leakage": "every population profile is the mean over the TRAINING ears of the fold that held the scored ear out; population_profile() takes FOLD, re-derives the split from the frozen rule and asserts ear- and SUBJECT-disjointness before averaging",
+ "definitions": {
+  "gt_curve_uniform_mm": "ORACLE curve (GT polyline), landmarks re-placed at equal arc length. Nothing predicted.",
+  "gt_curve_popprofile_mm": "ORACLE curve (GT polyline), landmarks re-placed at the TRAINING-fold mean profile. The floor of assuming a shared profile.",
+  "anchor_oracle_mm": "PREDICTED curve. k GT landmarks given; each anchor-bounded sub-polyline mapped onto its two GT anchors by a similarity, interior placed at the population profile. Includes the k oracle-exact anchors in the mean.",
+  "anchor_oracle_nonanchor_mm": "same, averaged over the n-k landmarks the oracle did NOT supply.",
+  "pred_curve_freepoint_floor_mm": "distance from each GT landmark to the PREDICTED polyline, free and non-monotone. The part no reparameterisation can remove.",
+  "gt_curve_anchor_floor_mm": "the k-anchor procedure run on the ORACLE GT curve: the profile cost alone at that k. Row 1's floor is only its k=2 case -- more anchors reset the accumulated phase drift.",
+  "zero_oracle_reparam_mm": "PREDICTED curve reparameterised to the population profile IN PLACE. No ground truth anywhere. The only deployable row.",
+  "inplace_phase_share_pct": "100*(baseline - pred_curve_freepoint_floor)/baseline: the share of the error any in-place reparameterisation could at most remove.",
+  "gt_endpoint_alignment_gain_mm": "freepoint_floor minus its GT-endpoint-aligned version. NEGATIVE means moving the curve onto the two GT endpoints makes its geometry worse.",
+  "anchor_noise": "k=2 with the two anchors perturbed by Gaussian noise of sd sigma (iso = 3D, tangent = along the contour), the perturbed anchors scored. sigma=0 is the oracle. breakeven_sigma_mm is an SD and is NOT comparable to a measured mean error; breakeven_mean_disp_mm is the same breakeven as a mean displacement and IS. Read it against the field named by compare_against."
+ },
+ "conclusion": "The shared-profile assumption is FREE for inner_helix (0.0918mm on the GT curve) and sup._antihelix (0.0355mm), and UNUSABLE for outer_helix (1.3882mm) and concha (1.0367mm) -- both of those floors sit at or above the error those contours already have (1.2649 / 0.9291mm), so no model can use a shared whole-contour profile there. Two GT endpoints take inner_helix 1.4805->1.0634 and sup._antihelix 1.2016->0.3296, worth -0.2007mm on all 85 (0.9889mm), or -0.1264mm once the two oracle-exact anchors per contour are NOT credited. outer_helix and concha need k>=4/4 anchors before the procedure beats their baseline on the non-anchor landmarks (k=3 already beats outer_helix's baseline if the 3 oracle-exact anchors are credited), and even at k=6 their floor on the GT CURVE is 0.1699/0.159mm while the predicted curve gives 0.3913/0.4495mm -- so what limits them is curve GEOMETRY, not phase. With no oracle at all, reparameterising in place HURTS every contour except sup._antihelix (-0.0127mm); there is no free lunch here. THE BAR (all figures MEAN DISPLACEMENTS, not Gaussian sds -- the raw breakeven sigmas are not comparable to a measured mean error): under PURELY TANGENTIAL endpoint error the k=2 gain dies at 0.77mm for inner_helix, whose endpoints carry 1.6887mm of tangential error today (2.2x too much), and at 1.27mm for sup._antihelix, which carries 0.988mm and is already INSIDE that bar. Under ISOTROPIC endpoint noise the bars are 0.90mm and 1.33mm against today's full 3D endpoint error of 1.8078 and 1.3505mm, i.e. inner_helix is 2x outside and sup._antihelix sits ON its bar. Real endpoint error is neither: inner_helix's is 93% tangential so its tangent bar is the honest one, sup._antihelix's is only 73% tangential so its true bar sits between the two and it is at BREAKEVEN, not clear of it. So inner_helix needs its endpoints roughly halved along the contour and sup._antihelix needs its across-contour endpoint error cut before either pays. The compute goes on ENDPOINT LOCALISATION for those two contours, not on a global profile prior and not on outer_helix or concha.",
+ "contours": {
+  "outer_helix": {
+   "n": 25,
+   "ks": [
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "mean_len_mm": 113.427,
+   "profile_sd": 0.0153,
+   "profile_sd_mm": 1.7379,
+   "baseline_mm": 1.2649,
+   "gt_curve_uniform_mm": 2.7529,
+   "gt_curve_popprofile_mm": 1.3882,
+   "pred_curve_freepoint_floor_mm": 0.5399,
+   "pred_curve_freepoint_floor_gtaligned_mm": 1.1225,
+   "zero_oracle_reparam_mm": 1.6442,
+   "zero_oracle_delta_mm": 0.3793,
+   "anchor_oracle_mm": {
+    "2": 1.9873,
+    "3": 1.1249,
+    "4": 0.6936,
+    "5": 0.4768,
+    "6": 0.3913
+   },
+   "anchor_oracle_nonanchor_mm": {
+    "2": 2.1601,
+    "3": 1.2783,
+    "4": 0.8257,
+    "5": 0.596,
+    "6": 0.5149
+   },
+   "gt_curve_anchor_floor_mm": {
+    "2": 1.3882,
+    "3": 0.7835,
+    "4": 0.3869,
+    "5": 0.1845,
+    "6": 0.1699
+   },
+   "inplace_phase_share_pct": 57.3,
+   "gt_endpoint_alignment_gain_mm": -0.5825,
+   "k2_gain_mm": -0.7224,
+   "k2_pct_of_its_own_ceiling": -507.2
+  },
+  "concha": {
+   "n": 30,
+   "ks": [
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "mean_len_mm": 82.371,
+   "profile_sd": 0.0162,
+   "profile_sd_mm": 1.3333,
+   "baseline_mm": 0.9291,
+   "gt_curve_uniform_mm": 2.0907,
+   "gt_curve_popprofile_mm": 1.0367,
+   "pred_curve_freepoint_floor_mm": 0.4712,
+   "pred_curve_freepoint_floor_gtaligned_mm": 1.412,
+   "zero_oracle_reparam_mm": 1.2693,
+   "zero_oracle_delta_mm": 0.3402,
+   "anchor_oracle_mm": {
+    "2": 2.208,
+    "3": 1.2716,
+    "4": 0.6979,
+    "5": 0.5465,
+    "6": 0.4495
+   },
+   "anchor_oracle_nonanchor_mm": {
+    "2": 2.3657,
+    "3": 1.4129,
+    "4": 0.8053,
+    "5": 0.6558,
+    "6": 0.5618
+   },
+   "gt_curve_anchor_floor_mm": {
+    "2": 1.0367,
+    "3": 0.6005,
+    "4": 0.373,
+    "5": 0.2261,
+    "6": 0.159
+   },
+   "inplace_phase_share_pct": 49.3,
+   "gt_endpoint_alignment_gain_mm": -0.9408,
+   "k2_gain_mm": -1.2789,
+   "k2_pct_of_its_own_ceiling": null
+  },
+  "inner_helix": {
+   "n": 20,
+   "ks": [
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "mean_len_mm": 50.451,
+   "profile_sd": 0.0063,
+   "profile_sd_mm": 0.3177,
+   "baseline_mm": 1.4805,
+   "gt_curve_uniform_mm": 0.0891,
+   "gt_curve_popprofile_mm": 0.0918,
+   "pred_curve_freepoint_floor_mm": 0.4588,
+   "pred_curve_freepoint_floor_gtaligned_mm": 0.908,
+   "zero_oracle_reparam_mm": 1.5078,
+   "zero_oracle_delta_mm": 0.0272,
+   "anchor_oracle_mm": {
+    "2": 1.0634,
+    "3": 0.4673,
+    "4": 0.3199,
+    "5": 0.2465,
+    "6": 0.1994
+   },
+   "anchor_oracle_nonanchor_mm": {
+    "2": 1.1815,
+    "3": 0.5498,
+    "4": 0.3999,
+    "5": 0.3287,
+    "6": 0.2849
+   },
+   "gt_curve_anchor_floor_mm": {
+    "2": 0.0918,
+    "3": 0.0514,
+    "4": 0.0311,
+    "5": 0.0257,
+    "6": 0.0193
+   },
+   "inplace_phase_share_pct": 69.0,
+   "gt_endpoint_alignment_gain_mm": -0.4492,
+   "k2_gain_mm": 0.4172,
+   "k2_pct_of_its_own_ceiling": 72.9
+  },
+  "sup._antihelix": {
+   "n": 10,
+   "ks": [
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "mean_len_mm": 16.843,
+   "profile_sd": 0.0073,
+   "profile_sd_mm": 0.1231,
+   "baseline_mm": 1.2016,
+   "gt_curve_uniform_mm": 0.0325,
+   "gt_curve_popprofile_mm": 0.0355,
+   "pred_curve_freepoint_floor_mm": 0.6959,
+   "pred_curve_freepoint_floor_gtaligned_mm": 0.3072,
+   "zero_oracle_reparam_mm": 1.1889,
+   "zero_oracle_delta_mm": -0.0127,
+   "anchor_oracle_mm": {
+    "2": 0.3296,
+    "3": 0.1538,
+    "4": 0.0891,
+    "5": 0.061,
+    "6": 0.0446
+   },
+   "anchor_oracle_nonanchor_mm": {
+    "2": 0.4121,
+    "3": 0.2197,
+    "4": 0.1485,
+    "5": 0.1219,
+    "6": 0.1115
+   },
+   "gt_curve_anchor_floor_mm": {
+    "2": 0.0355,
+    "3": 0.0177,
+    "4": 0.0083,
+    "5": 0.0062,
+    "6": 0.0043
+   },
+   "inplace_phase_share_pct": 42.1,
+   "gt_endpoint_alignment_gain_mm": 0.3887,
+   "k2_gain_mm": 0.872,
+   "k2_pct_of_its_own_ceiling": 97.5
+  }
+ },
+ "combine": {
+  "baseline_all85_mm": 1.1897,
+  "replaced": [
+   "inner_helix",
+   "sup._antihelix"
+  ],
+  "k2_oracle": {
+   "all85_mm": 0.9889,
+   "delta_mm": -0.2007
+  },
+  "k2_oracle_no_anchor_credit": {
+   "all85_mm": 1.0632,
+   "delta_mm": -0.1264
+  },
+  "zero_oracle_reparam": {
+   "all85_mm": 1.1946,
+   "delta_mm": 0.0049
+  },
+  "zero_oracle_reparam_all_contours": {
+   "all85_mm": 1.4262,
+   "delta_mm": 0.2366
+  }
+ },
+ "anchor_noise": {
+  "iso": {
+   "outer_helix": {
+    "mode": "iso",
+    "current_anchor_error_mm": 1.2444,
+    "current_anchor_tangential_mm": 0.8291,
+    "current_anchor_perp_mm": 0.7784,
+    "baseline_mm": 1.2649,
+    "by_sigma_mm": {
+     "0.0": 1.9873,
+     "0.25": 2.0722,
+     "0.5": 2.2352,
+     "0.75": 2.4576,
+     "1.0": 2.7239,
+     "1.5": 3.3464,
+     "2.0": 4.045
+    },
+    "breakeven_sigma_mm": null,
+    "breakeven_mean_disp_mm": null,
+    "compare_against": "current_anchor_error_mm",
+    "nrep": 3
+   },
+   "concha": {
+    "mode": "iso",
+    "current_anchor_error_mm": 0.855,
+    "current_anchor_tangential_mm": 0.546,
+    "current_anchor_perp_mm": 0.5388,
+    "baseline_mm": 0.9291,
+    "by_sigma_mm": {
+     "0.0": 2.208,
+     "0.25": 2.4613,
+     "0.5": 2.9802,
+     "0.75": 3.651,
+     "1.0": 4.4038,
+     "1.5": 6.031,
+     "2.0": 7.7347
+    },
+    "breakeven_sigma_mm": null,
+    "breakeven_mean_disp_mm": null,
+    "compare_against": "current_anchor_error_mm",
+    "nrep": 3
+   },
+   "inner_helix": {
+    "mode": "iso",
+    "current_anchor_error_mm": 1.8078,
+    "current_anchor_tangential_mm": 1.6887,
+    "current_anchor_perp_mm": 0.4308,
+    "baseline_mm": 1.4805,
+    "by_sigma_mm": {
+     "0.0": 1.0634,
+     "0.25": 1.18,
+     "0.5": 1.4047,
+     "0.75": 1.6905,
+     "1.0": 2.0129,
+     "1.5": 2.7182,
+     "2.0": 3.466
+    },
+    "breakeven_sigma_mm": 0.566,
+    "breakeven_mean_disp_mm": 0.9032,
+    "compare_against": "current_anchor_error_mm",
+    "nrep": 3
+   },
+   "sup._antihelix": {
+    "mode": "iso",
+    "current_anchor_error_mm": 1.3505,
+    "current_anchor_tangential_mm": 0.988,
+    "current_anchor_perp_mm": 0.7493,
+    "baseline_mm": 1.2016,
+    "by_sigma_mm": {
+     "0.0": 0.3296,
+     "0.25": 0.5139,
+     "0.5": 0.7909,
+     "0.75": 1.0969,
+     "1.0": 1.4151,
+     "1.5": 2.0672,
+     "2.0": 2.7285
+    },
+    "breakeven_sigma_mm": 0.832,
+    "breakeven_mean_disp_mm": 1.3277,
+    "compare_against": "current_anchor_error_mm",
+    "nrep": 3
+   }
+  },
+  "tangent": {
+   "outer_helix": {
+    "mode": "tangent",
+    "current_anchor_error_mm": 1.2444,
+    "current_anchor_tangential_mm": 0.8291,
+    "current_anchor_perp_mm": 0.7784,
+    "baseline_mm": 1.2649,
+    "by_sigma_mm": {
+     "0.0": 1.9873,
+     "0.25": 2.0181,
+     "0.5": 2.0771,
+     "0.75": 2.16,
+     "1.0": 2.2628,
+     "1.5": 2.5165,
+     "2.0": 2.8173
+    },
+    "breakeven_sigma_mm": null,
+    "breakeven_mean_disp_mm": null,
+    "compare_against": "current_anchor_tangential_mm",
+    "nrep": 3
+   },
+   "concha": {
+    "mode": "tangent",
+    "current_anchor_error_mm": 0.855,
+    "current_anchor_tangential_mm": 0.546,
+    "current_anchor_perp_mm": 0.5388,
+    "baseline_mm": 0.9291,
+    "by_sigma_mm": {
+     "0.0": 2.208,
+     "0.25": 2.2841,
+     "0.5": 2.4775,
+     "0.75": 2.7568,
+     "1.0": 3.0963,
+     "1.5": 3.8881,
+     "2.0": 4.7655
+    },
+    "breakeven_sigma_mm": null,
+    "breakeven_mean_disp_mm": null,
+    "compare_against": "current_anchor_tangential_mm",
+    "nrep": 3
+   },
+   "inner_helix": {
+    "mode": "tangent",
+    "current_anchor_error_mm": 1.8078,
+    "current_anchor_tangential_mm": 1.6887,
+    "current_anchor_perp_mm": 0.4308,
+    "baseline_mm": 1.4805,
+    "by_sigma_mm": {
+     "0.0": 1.0634,
+     "0.25": 1.1153,
+     "0.5": 1.216,
+     "0.75": 1.3479,
+     "1.0": 1.5007,
+     "1.5": 1.8466,
+     "2.0": 2.2259
+    },
+    "breakeven_sigma_mm": 0.967,
+    "breakeven_mean_disp_mm": 0.7716,
+    "compare_against": "current_anchor_tangential_mm",
+    "nrep": 3
+   },
+   "sup._antihelix": {
+    "mode": "tangent",
+    "current_anchor_error_mm": 1.3505,
+    "current_anchor_tangential_mm": 0.988,
+    "current_anchor_perp_mm": 0.7493,
+    "baseline_mm": 1.2016,
+    "by_sigma_mm": {
+     "0.0": 0.3296,
+     "0.25": 0.411,
+     "0.5": 0.5345,
+     "0.75": 0.6749,
+     "1.0": 0.8244,
+     "1.5": 1.1384,
+     "2.0": 1.4634
+    },
+    "breakeven_sigma_mm": 1.597,
+    "breakeven_mean_disp_mm": 1.2742,
+    "compare_against": "current_anchor_tangential_mm",
+    "nrep": 3
+   }
+  }
+ },
+ "all85": {
+  "baseline_mm": 1.1897,
+  "gt_curve_uniform_mm": 1.5724,
+  "gt_curve_popprofile_mm": 0.8,
+  "pred_curve_freepoint_floor_mm": 0.5149,
+  "pred_curve_freepoint_floor_gtaligned_mm": 1.0783,
+  "zero_oracle_reparam_mm": 1.4262
+ }
+}

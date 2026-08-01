@@ -202,6 +202,8 @@ REGISTRY = {
     "template":    ("fam_template", None),
     "bilateral":   ("fam_bilateral", None),         # MODE=single|bilateral|bilateral_head
     "phase":       ("fam_phase", None),             # explicit curve + monotone phase
+    "profile":     ("fam_profile", None),           # arc-length placement, PROFILE_CONTOURS
+    "endpoint":    ("fam_endpoint", None),          # contour-endpoint specialist (ARTEFACTS)
 }
 
 TRAIN_DEFAULTS = dict(lr=1.5e-3, bs=16, wd=5e-4, sub_frac=0.625,

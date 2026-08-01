@@ -1,0 +1,2969 @@
+{
+ "config": {
+  "work": "scratch",
+  "models": [
+   "normalsfix",
+   "famA_kpconv",
+   "famA_ptv3"
+  ],
+  "seeds": [
+   0,
+   1,
+   2
+  ],
+  "member_sets": [
+   "ensemble",
+   "separate"
+  ],
+  "objs": [
+   "mle",
+   "mse"
+  ],
+  "schemes": [
+   "global",
+   "contour",
+   "direction",
+   "contour_x_direction"
+  ],
+  "ridge": 0.0,
+  "nb": 20000,
+  "boot_seed": 5,
+  "nhull": 2000,
+  "hull_seed": 7,
+  "check_f0": true,
+  "pred": "raw",
+  "ens_npy": "ensemble_weighted.npy",
+  "out": "research/results/ensemble_weighted.json",
+  "feats": "scratch/ortho_feats.npz",
+  "seed_mode": "ensemble"
+ },
+ "n_ears": 340,
+ "n_subjects": 170,
+ "fold_check": "frozen rule + ortho_feats.npz + research/results/folds.json",
+ "frame_check": {
+  "max_abs_gram_error": 2.220446049250313e-15,
+  "det_min": 0.9999999999999996,
+  "det_max": 1.0000000000000004
+ },
+ "fold0_published_table_check": {
+  "tangent_t": {
+   "best_single_rmse": 1.3679,
+   "equal_weight_rmse": 1.3742,
+   "insample_optimal_rmse_LEAKY": 1.3493,
+   "published_optimal_rmse": 1.3493,
+   "weights_LEAKY": {
+    "dgcnn": 0.647,
+    "kpconv": 0.133,
+    "ptv3": 0.117,
+    "pointnext": 0.103
+   },
+   "published_weights": {
+    "dgcnn": 0.647,
+    "kpconv": 0.133,
+    "ptv3": 0.117,
+    "pointnext": 0.103
+   }
+  },
+  "across_b": {
+   "best_single_rmse": 0.6748,
+   "equal_weight_rmse": 0.6549,
+   "insample_optimal_rmse_LEAKY": 0.6501,
+   "published_optimal_rmse": 0.6501,
+   "weights_LEAKY": {
+    "dgcnn": 0.34,
+    "kpconv": 0.382,
+    "ptv3": 0.182,
+    "pointnext": 0.096
+   },
+   "published_weights": {
+    "dgcnn": 0.34,
+    "kpconv": 0.382,
+    "ptv3": 0.182,
+    "pointnext": 0.096
+   }
+  },
+  "normal_n": {
+   "best_single_rmse": 0.2307,
+   "equal_weight_rmse": 0.2189,
+   "insample_optimal_rmse_LEAKY": 0.2178,
+   "published_optimal_rmse": 0.2178,
+   "weights_LEAKY": {
+    "dgcnn": 0.138,
+    "kpconv": 0.233,
+    "ptv3": 0.225,
+    "pointnext": 0.404
+   },
+   "published_weights": {
+    "dgcnn": 0.138,
+    "kpconv": 0.233,
+    "ptv3": 0.225,
+    "pointnext": 0.404
+   }
+  },
+  "max_deviation": 0.000468
+ },
+ "member_sets": {
+  "ensemble": {
+   "members": {
+    "normalsfix": {
+     "spec": "normalsfix",
+     "seeds": [
+      0,
+      1,
+      2
+     ],
+     "per_fold_MLE": {
+      "0": 1.2236,
+      "1": 1.2085,
+      "2": 1.2773,
+      "3": 1.1715,
+      "4": 1.2651
+     }
+    },
+    "famA_kpconv": {
+     "spec": "famA_kpconv",
+     "seeds": [],
+     "seedless": true,
+     "per_fold_MLE": {
+      "0": 1.2964,
+      "1": 1.2213,
+      "2": 1.3589,
+      "3": 1.262,
+      "4": 1.3018
+     }
+    },
+    "famA_ptv3": {
+     "spec": "famA_ptv3",
+     "seeds": [],
+     "seedless": true,
+     "per_fold_MLE": {
+      "0": 1.3291,
+      "1": 1.2278,
+      "2": 1.3586,
+      "3": 1.2691,
+      "4": 1.3066
+     }
+    }
+   },
+   "n_members": 3,
+   "best_single": "normalsfix",
+   "per_member_pooled_OOF_mm": {
+    "normalsfix": 1.2292,
+    "famA_kpconv": 1.2881,
+    "famA_ptv3": 1.2982
+   },
+   "equal_weight": {
+    "MLE_mm": 1.1952,
+    "per_contour_MLE_mm": {
+     "outer_helix": 1.2686,
+     "concha": 0.937,
+     "inner_helix": 1.4859,
+     "sup._antihelix": 1.2051
+    },
+    "directional_rmse_mm": {
+     "tangent_t": 1.3599,
+     "across_b": 0.6388,
+     "normal_n": 0.2171
+    },
+    "bootstrap_vs_best_single": {
+     "delta_mm": -0.034,
+     "ci95": [
+      -0.0472,
+      -0.0203
+     ],
+     "p_negative": 1.0
+    }
+   },
+   "schemes": {
+    "mle/global": {
+     "objective": "mle",
+     "scheme": "global",
+     "n_weights": 3,
+     "nested_MLE_mm": 1.1927,
+     "LEAKY_in_sample_MLE_mm": 1.1918,
+     "optimism_mm": 0.0008,
+     "delta_vs_equal_weight_mm": -0.0025,
+     "per_contour_MLE_mm": {
+      "outer_helix": 1.2656,
+      "concha": 0.9355,
+      "inner_helix": 1.485,
+      "sup._antihelix": 1.197
+     },
+     "directional_rmse_mm": {
+      "tangent_t": 1.3581,
+      "across_b": 0.6359,
+      "normal_n": 0.2171
+     },
+     "weights_LEAKY": {
+      "normalsfix": [
+       0.4846
+      ],
+      "famA_kpconv": [
+       0.2686
+      ],
+      "famA_ptv3": [
+       0.2468
+      ]
+     },
+     "weights_nested_mean": {
+      "normalsfix": [
+       0.4844
+      ],
+      "famA_kpconv": [
+       0.2688
+      ],
+      "famA_ptv3": [
+       0.2468
+      ]
+     },
+     "weights_nested_sd": {
+      "normalsfix": [
+       0.0271
+      ],
+      "famA_kpconv": [
+       0.0138
+      ],
+      "famA_ptv3": [
+       0.0158
+      ]
+     },
+     "group_layout": [
+      [
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0
+      ]
+     ],
+     "bootstrap_vs_equal_weight": {
+      "delta_mm": -0.0025,
+      "ci95": [
+       -0.0059,
+       0.0007
+      ],
+      "p_negative": 0.9349,
+      "verdict": "INDISTINGUISHABLE"
+     }
+    },
+    "mle/contour": {
+     "objective": "mle",
+     "scheme": "contour",
+     "n_weights": 12,
+     "nested_MLE_mm": 1.1939,
+     "LEAKY_in_sample_MLE_mm": 1.1914,
+     "optimism_mm": 0.0025,
+     "delta_vs_equal_weight_mm": -0.0013,
+     "per_contour_MLE_mm": {
+      "outer_helix": 1.2658,
+      "concha": 0.9366,
+      "inner_helix": 1.488,
+      "sup._antihelix": 1.1982
+     },
+     "directional_rmse_mm": {
+      "tangent_t": 1.3603,
+      "across_b": 0.6362,
+      "normal_n": 0.2176
+     },
+     "weights_LEAKY": {
+      "normalsfix": [
+       0.4989,
+       0.4601,
+       0.4567,
+       0.5316
+      ],
+      "famA_kpconv": [
+       0.22,
+       0.3201,
+       0.2881,
+       0.26
+      ],
+      "famA_ptv3": [
+       0.2811,
+       0.2198,
+       0.2553,
+       0.2085
+      ]
+     },
+     "weights_nested_mean": {
+      "normalsfix": [
+       0.4986,
+       0.4592,
+       0.4575,
+       0.5324
+      ],
+      "famA_kpconv": [
+       0.2196,
+       0.3208,
+       0.287,
+       0.2613
+      ],
+      "famA_ptv3": [
+       0.2818,
+       0.22,
+       0.2555,
+       0.2062
+      ]
+     },
+     "weights_nested_sd": {
+      "normalsfix": [
+       0.0307,
+       0.0461,
+       0.059,
+       0.0236
+      ],
+      "famA_kpconv": [
+       0.02,
+       0.0099,
+       0.0407,
+       0.0161
+      ],
+      "famA_ptv3": [
+       0.0214,
+       0.0366,
+       0.0296,
+       0.0292
+      ]
+     },
+     "group_layout": [
+      [
+       0,
+       0,
+       0
+      ],
+      [
+       1,
+       1,
+       1
+      ],
+      [
+       2,
+       2,
+       2
+      ],
+      [
+       3,
+       3,
+       3
+      ]
+     ],
+     "bootstrap_vs_equal_weight": {
+      "delta_mm": -0.0013,
+      "ci95": [
+       -0.0048,
+       0.0021
+      ],
+      "p_negative": 0.7665,
+      "verdict": "INDISTINGUISHABLE"
+     }
+    },
+    "mle/direction": {
+     "objective": "mle",
+     "scheme": "direction",
+     "n_weights": 9,
+     "nested_MLE_mm": 1.1915,
+     "LEAKY_in_sample_MLE_mm": 1.1902,
+     "optimism_mm": 0.0013,
+     "delta_vs_equal_weight_mm": -0.0037,
+     "per_contour_MLE_mm": {
+      "outer_helix": 1.2634,
+      "concha": 0.9343,
+      "inner_helix": 1.4847,
+      "sup._antihelix": 1.1966
+     },
+     "directional_rmse_mm": {
+      "tangent_t": 1.3582,
+      "across_b": 0.6351,
+      "normal_n": 0.2181
+     },
+     "weights_LEAKY": {
+      "normalsfix": [
+       0.5139,
+       0.4563,
+       0.225
+      ],
+      "famA_kpconv": [
+       0.2217,
+       0.3737,
+       0.4994
+      ],
+      "famA_ptv3": [
+       0.2644,
+       0.17,
+       0.2755
+      ]
+     },
+     "weights_nested_mean": {
+      "normalsfix": [
+       0.5134,
+       0.4558,
+       0.2246
+      ],
+      "famA_kpconv": [
+       0.2218,
+       0.3737,
+       0.4986
+      ],
+      "famA_ptv3": [
+       0.2648,
+       0.1705,
+       0.2768
+      ]
+     },
+     "weights_nested_sd": {
+      "normalsfix": [
+       0.0364,
+       0.0169,
+       0.02
+      ],
+      "famA_kpconv": [
+       0.0157,
+       0.0209,
+       0.0214
+      ],
+      "famA_ptv3": [
+       0.023,
+       0.0142,
+       0.0256
+      ]
+     },
+     "group_layout": [
+      [
+       0,
+       1,
+       2
+      ],
+      [
+       0,
+       1,
+       2
+      ],
+      [
+       0,
+       1,
+       2
+      ],
+      [
+       0,
+       1,
+       2
+      ]
+     ],
+     "bootstrap_vs_equal_weight": {
+      "delta_mm": -0.0037,
+      "ci95": [
+       -0.0075,
+       0.0
+      ],
+      "p_negative": 0.9739,
+      "verdict": "INDISTINGUISHABLE"
+     }
+    },
+    "mle/contour_x_direction": {
+     "objective": "mle",
+     "scheme": "contour_x_direction",
+     "n_weights": 36,
+     "nested_MLE_mm": 1.1929,
+     "LEAKY_in_sample_MLE_mm": 1.1893,
+     "optimism_mm": 0.0037,
+     "delta_vs_equal_weight_mm": -0.0023,
+     "per_contour_MLE_mm": {
+      "outer_helix": 1.2639,
+      "concha": 0.9359,
+      "inner_helix": 1.4883,
+      "sup._antihelix": 1.1959
+     },
+     "directional_rmse_mm": {
+      "tangent_t": 1.361,
+      "across_b": 0.6347,
+      "normal_n": 0.218
+     },
+     "weights_LEAKY": {
+      "normalsfix": [
+       0.4998,
+       0.555,
+       0.1538,
+       0.4997,
+       0.409,
+       0.2872,
+       0.4792,
+       0.3777,
+       0.2145,
+       0.6143,
+       0.456,
+       0.1706
+      ],
+      "famA_kpconv": [
+       0.1714,
+       0.3332,
+       0.507,
+       0.2546,
+       0.4472,
+       0.485,
+       0.2617,
+       0.4141,
+       0.5356,
+       0.2169,
+       0.3004,
+       0.4215
+      ],
+      "famA_ptv3": [
+       0.3288,
+       0.1118,
+       0.3392,
+       0.2457,
+       0.1439,
+       0.2278,
+       0.2591,
+       0.2082,
+       0.2498,
+       0.1688,
+       0.2436,
+       0.408
+      ]
+     },
+     "weights_nested_mean": {
+      "normalsfix": [
+       0.5,
+       0.5549,
+       0.1533,
+       0.4986,
+       0.4091,
+       0.2864,
+       0.4797,
+       0.3778,
+       0.2147,
+       0.615,
+       0.4572,
+       0.1698
+      ],
+      "famA_kpconv": [
+       0.1698,
+       0.3322,
+       0.5062,
+       0.2557,
+       0.4461,
+       0.4836,
+       0.2603,
+       0.4135,
+       0.5349,
+       0.2188,
+       0.2999,
+       0.4237
+      ],
+      "famA_ptv3": [
+       0.3302,
+       0.113,
+       0.3406,
+       0.2457,
+       0.1447,
+       0.23,
+       0.2601,
+       0.2087,
+       0.2503,
+       0.1662,
+       0.2428,
+       0.4066
+      ]
+     },
+     "weights_nested_sd": {
+      "normalsfix": [
+       0.0409,
+       0.0154,
+       0.018,
+       0.0559,
+       0.0402,
+       0.0391,
+       0.0717,
+       0.0515,
+       0.0337,
+       0.0297,
+       0.0142,
+       0.0136
+      ],
+      "famA_kpconv": [
+       0.0291,
+       0.0292,
+       0.0198,
+       0.0152,
+       0.0237,
+       0.0334,
+       0.0448,
+       0.0555,
+       0.0443,
+       0.0255,
+       0.0169,
+       0.0351
+      ],
+      "famA_ptv3": [
+       0.038,
+       0.0167,
+       0.0251,
+       0.0455,
+       0.0283,
+       0.0433,
+       0.0386,
+       0.0292,
+       0.0226,
+       0.036,
+       0.0226,
+       0.046
+      ]
+     },
+     "group_layout": [
+      [
+       0,
+       1,
+       2
+      ],
+      [
+       3,
+       4,
+       5
+      ],
+      [
+       6,
+       7,
+       8
+      ],
+      [
+       9,
+       10,
+       11
+      ]
+     ],
+     "bootstrap_vs_equal_weight": {
+      "delta_mm": -0.0023,
+      "ci95": [
+       -0.0062,
+       0.0016
+      ],
+      "p_negative": 0.872,
+      "verdict": "INDISTINGUISHABLE"
+     }
+    },
+    "mse/global": {
+     "objective": "mse",
+     "scheme": "global",
+     "n_weights": 3,
+     "nested_MLE_mm": 1.1932,
+     "LEAKY_in_sample_MLE_mm": 1.1919,
+     "optimism_mm": 0.0013,
+     "delta_vs_equal_weight_mm": -0.002,
+     "per_contour_MLE_mm": {
+      "outer_helix": 1.2656,
+      "concha": 0.9362,
+      "inner_helix": 1.4863,
+      "sup._antihelix": 1.1972
+     },
+     "directional_rmse_mm": {
+      "tangent_t": 1.3587,
+      "across_b": 0.6365,
+      "normal_n": 0.2175
+     },
+     "weights_LEAKY": {
+      "normalsfix": [
+       0.495
+      ],
+      "famA_kpconv": [
+       0.2478
+      ],
+      "famA_ptv3": [
+       0.2572
+      ]
+     },
+     "weights_nested_mean": {
+      "normalsfix": [
+       0.4948
+      ],
+      "famA_kpconv": [
+       0.248
+      ],
+      "famA_ptv3": [
+       0.2572
+      ]
+     },
+     "weights_nested_sd": {
+      "normalsfix": [
+       0.0428
+      ],
+      "famA_kpconv": [
+       0.0238
+      ],
+      "famA_ptv3": [
+       0.0224
+      ]
+     },
+     "group_layout": [
+      [
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0
+      ]
+     ],
+     "bootstrap_vs_equal_weight": {
+      "delta_mm": -0.002,
+      "ci95": [
+       -0.0056,
+       0.0016
+      ],
+      "p_negative": 0.8599,
+      "verdict": "INDISTINGUISHABLE"
+     }
+    },
+    "mse/contour": {
+     "objective": "mse",
+     "scheme": "contour",
+     "n_weights": 12,
+     "nested_MLE_mm": 1.1951,
+     "LEAKY_in_sample_MLE_mm": 1.1919,
+     "optimism_mm": 0.0033,
+     "delta_vs_equal_weight_mm": -0.0001,
+     "per_contour_MLE_mm": {
+      "outer_helix": 1.2657,
+      "concha": 0.937,
+      "inner_helix": 1.4923,
+      "sup._antihelix": 1.1989
+     },
+     "directional_rmse_mm": {
+      "tangent_t": 1.3617,
+      "across_b": 0.6369,
+      "normal_n": 0.2181
+     },
+     "weights_LEAKY": {
+      "normalsfix": [
+       0.4988,
+       0.5037,
+       0.425,
+       0.5738
+      ],
+      "famA_kpconv": [
+       0.2335,
+       0.2972,
+       0.2414,
+       0.2232
+      ],
+      "famA_ptv3": [
+       0.2677,
+       0.1991,
+       0.3336,
+       0.203
+      ]
+     },
+     "weights_nested_mean": {
+      "normalsfix": [
+       0.4985,
+       0.5023,
+       0.426,
+       0.5748
+      ],
+      "famA_kpconv": [
+       0.2334,
+       0.2959,
+       0.2425,
+       0.2234
+      ],
+      "famA_ptv3": [
+       0.2681,
+       0.2018,
+       0.3315,
+       0.2018
+      ]
+     },
+     "weights_nested_sd": {
+      "normalsfix": [
+       0.0307,
+       0.0451,
+       0.0942,
+       0.0342
+      ],
+      "famA_kpconv": [
+       0.0167,
+       0.0167,
+       0.0703,
+       0.0208
+      ],
+      "famA_ptv3": [
+       0.0214,
+       0.0482,
+       0.0476,
+       0.0305
+      ]
+     },
+     "group_layout": [
+      [
+       0,
+       0,
+       0
+      ],
+      [
+       1,
+       1,
+       1
+      ],
+      [
+       2,
+       2,
+       2
+      ],
+      [
+       3,
+       3,
+       3
+      ]
+     ],
+     "bootstrap_vs_equal_weight": {
+      "delta_mm": -0.0001,
+      "ci95": [
+       -0.004,
+       0.0038
+      ],
+      "p_negative": 0.5119,
+      "verdict": "INDISTINGUISHABLE"
+     }
+    },
+    "mse/direction": {
+     "objective": "mse",
+     "scheme": "direction",
+     "n_weights": 9,
+     "nested_MLE_mm": 1.1925,
+     "LEAKY_in_sample_MLE_mm": 1.1907,
+     "optimism_mm": 0.0018,
+     "delta_vs_equal_weight_mm": -0.0027,
+     "per_contour_MLE_mm": {
+      "outer_helix": 1.2636,
+      "concha": 0.9352,
+      "inner_helix": 1.4866,
+      "sup._antihelix": 1.1984
+     },
+     "directional_rmse_mm": {
+      "tangent_t": 1.3593,
+      "across_b": 0.6353,
+      "normal_n": 0.2171
+     },
+     "weights_LEAKY": {
+      "normalsfix": [
+       0.4908,
+       0.5142,
+       0.3893
+      ],
+      "famA_kpconv": [
+       0.2209,
+       0.3372,
+       0.4014
+      ],
+      "famA_ptv3": [
+       0.2883,
+       0.1486,
+       0.2093
+      ]
+     },
+     "weights_nested_mean": {
+      "normalsfix": [
+       0.4907,
+       0.5133,
+       0.3863
+      ],
+      "famA_kpconv": [
+       0.2211,
+       0.3362,
+       0.4019
+      ],
+      "famA_ptv3": [
+       0.2882,
+       0.1504,
+       0.2118
+      ]
+     },
+     "weights_nested_sd": {
+      "normalsfix": [
+       0.0539,
+       0.0228,
+       0.039
+      ],
+      "famA_kpconv": [
+       0.0281,
+       0.0227,
+       0.0382
+      ],
+      "famA_ptv3": [
+       0.031,
+       0.0255,
+       0.0319
+      ]
+     },
+     "group_layout": [
+      [
+       0,
+       1,
+       2
+      ],
+      [
+       0,
+       1,
+       2
+      ],
+      [
+       0,
+       1,
+       2
+      ],
+      [
+       0,
+       1,
+       2
+      ]
+     ],
+     "bootstrap_vs_equal_weight": {
+      "delta_mm": -0.0027,
+      "ci95": [
+       -0.0064,
+       0.001
+      ],
+      "p_negative": 0.9237,
+      "verdict": "INDISTINGUISHABLE"
+     }
+    },
+    "mse/contour_x_direction": {
+     "objective": "mse",
+     "scheme": "contour_x_direction",
+     "n_weights": 36,
+     "nested_MLE_mm": 1.1945,
+     "LEAKY_in_sample_MLE_mm": 1.1903,
+     "optimism_mm": 0.0042,
+     "delta_vs_equal_weight_mm": -0.0007,
+     "per_contour_MLE_mm": {
+      "outer_helix": 1.2635,
+      "concha": 0.9372,
+      "inner_helix": 1.4926,
+      "sup._antihelix": 1.1974
+     },
+     "directional_rmse_mm": {
+      "tangent_t": 1.3621,
+      "across_b": 0.6351,
+      "normal_n": 0.217
+     },
+     "weights_LEAKY": {
+      "normalsfix": [
+       0.4843,
+       0.5902,
+       0.1951,
+       0.5075,
+       0.4695,
+       0.5459,
+       0.4227,
+       0.3985,
+       0.3589,
+       0.6368,
+       0.5043,
+       0.1926
+      ],
+      "famA_kpconv": [
+       0.2133,
+       0.2903,
+       0.4706,
+       0.2274,
+       0.46,
+       0.3115,
+       0.2273,
+       0.4124,
+       0.4393,
+       0.2206,
+       0.1974,
+       0.4578
+      ],
+      "famA_ptv3": [
+       0.3024,
+       0.1195,
+       0.3343,
+       0.2651,
+       0.0705,
+       0.1426,
+       0.35,
+       0.1891,
+       0.2018,
+       0.1426,
+       0.2983,
+       0.3496
+      ]
+     },
+     "weights_nested_mean": {
+      "normalsfix": [
+       0.4841,
+       0.5893,
+       0.195,
+       0.5062,
+       0.4666,
+       0.5332,
+       0.424,
+       0.3992,
+       0.3574,
+       0.6369,
+       0.506,
+       0.192
+      ],
+      "famA_kpconv": [
+       0.2128,
+       0.2906,
+       0.47,
+       0.2286,
+       0.4537,
+       0.3181,
+       0.2284,
+       0.4114,
+       0.4416,
+       0.2215,
+       0.1968,
+       0.4581
+      ],
+      "famA_ptv3": [
+       0.3032,
+       0.1201,
+       0.335,
+       0.2652,
+       0.0797,
+       0.1487,
+       0.3476,
+       0.1894,
+       0.201,
+       0.1416,
+       0.2972,
+       0.3499
+      ]
+     },
+     "weights_nested_sd": {
+      "normalsfix": [
+       0.036,
+       0.0251,
+       0.022,
+       0.0564,
+       0.0556,
+       0.0807,
+       0.1046,
+       0.0579,
+       0.0444,
+       0.0438,
+       0.0268,
+       0.0405
+      ],
+      "famA_kpconv": [
+       0.0195,
+       0.0269,
+       0.0126,
+       0.0239,
+       0.0393,
+       0.0752,
+       0.0728,
+       0.0547,
+       0.0627,
+       0.0345,
+       0.0228,
+       0.0305
+      ],
+      "famA_ptv3": [
+       0.0316,
+       0.0153,
+       0.0202,
+       0.0414,
+       0.0665,
+       0.0471,
+       0.0558,
+       0.0356,
+       0.0261,
+       0.0394,
+       0.0181,
+       0.0685
+      ]
+     },
+     "group_layout": [
+      [
+       0,
+       1,
+       2
+      ],
+      [
+       3,
+       4,
+       5
+      ],
+      [
+       6,
+       7,
+       8
+      ],
+      [
+       9,
+       10,
+       11
+      ]
+     ],
+     "bootstrap_vs_equal_weight": {
+      "delta_mm": -0.0007,
+      "ci95": [
+       -0.0048,
+       0.0034
+      ],
+      "p_negative": 0.634,
+      "verdict": "INDISTINGUISHABLE"
+     }
+    }
+   },
+   "disjointness": [
+    {
+     "outer_fold": 0,
+     "n_fit_ears": 272,
+     "n_eval_ears": 68,
+     "ear_overlap": 0,
+     "subject_overlap": 0,
+     "in_fit_MLE_mm": 1.1898,
+     "held_out_MLE_mm": 1.2003
+    },
+    {
+     "outer_fold": 1,
+     "n_fit_ears": 272,
+     "n_eval_ears": 68,
+     "ear_overlap": 0,
+     "subject_overlap": 0,
+     "in_fit_MLE_mm": 1.2021,
+     "held_out_MLE_mm": 1.1516
+    },
+    {
+     "outer_fold": 2,
+     "n_fit_ears": 272,
+     "n_eval_ears": 68,
+     "ear_overlap": 0,
+     "subject_overlap": 0,
+     "in_fit_MLE_mm": 1.1782,
+     "held_out_MLE_mm": 1.2463
+    },
+    {
+     "outer_fold": 3,
+     "n_fit_ears": 272,
+     "n_eval_ears": 68,
+     "ear_overlap": 0,
+     "subject_overlap": 0,
+     "in_fit_MLE_mm": 1.2038,
+     "held_out_MLE_mm": 1.1444
+    },
+    {
+     "outer_fold": 4,
+     "n_fit_ears": 272,
+     "n_eval_ears": 68,
+     "ear_overlap": 0,
+     "subject_overlap": 0,
+     "in_fit_MLE_mm": 1.1847,
+     "held_out_MLE_mm": 1.2207
+    }
+   ],
+   "geometry": {
+    "box_containment_slack_mm": -0.000188564594445495,
+    "dist_to_equal_weight_point_mm": {
+     "mean": 0.1149,
+     "median": 0.0905,
+     "p90": 0.2247,
+     "max": 1.7927
+    },
+    "dist_to_nearest_member_mm": {
+     "mean": 0.2304,
+     "median": 0.1945,
+     "p90": 0.4152,
+     "max": 3.9831
+    },
+    "dist_of_equal_weight_to_nearest_member_mm": {
+     "mean": 0.2325,
+     "median": 0.1991,
+     "p90": 0.4141,
+     "max": 3.7101
+    },
+    "member_spread_mm": {
+     "mean": 1.0203,
+     "median": 0.8843,
+     "p90": 1.7874,
+     "max": 13.2002
+    },
+    "dist_to_member_convex_hull_mm": {
+     "mean": 0.0268,
+     "median": 0.0183,
+     "p90": 0.0592,
+     "max": 0.4093,
+     "n_sampled": 2000,
+     "frac_outside_1e-6": 1.0
+    },
+    "ratio_travel_to_spread": 0.1168
+   },
+   "signed_residual_correlation": {
+    "tangent_t": {
+     "normalsfix": {
+      "normalsfix": 1.0,
+      "famA_kpconv": 0.8618,
+      "famA_ptv3": 0.8594
+     },
+     "famA_kpconv": {
+      "normalsfix": 0.8618,
+      "famA_kpconv": 1.0,
+      "famA_ptv3": 0.816
+     },
+     "famA_ptv3": {
+      "normalsfix": 0.8594,
+      "famA_kpconv": 0.816,
+      "famA_ptv3": 1.0
+     }
+    },
+    "across_b": {
+     "normalsfix": {
+      "normalsfix": 1.0,
+      "famA_kpconv": 0.8477,
+      "famA_ptv3": 0.8278
+     },
+     "famA_kpconv": {
+      "normalsfix": 0.8477,
+      "famA_kpconv": 1.0,
+      "famA_ptv3": 0.7922
+     },
+     "famA_ptv3": {
+      "normalsfix": 0.8278,
+      "famA_kpconv": 0.7922,
+      "famA_ptv3": 1.0
+     }
+    },
+    "normal_n": {
+     "normalsfix": {
+      "normalsfix": 1.0,
+      "famA_kpconv": 0.7696,
+      "famA_ptv3": 0.736
+     },
+     "famA_kpconv": {
+      "normalsfix": 0.7696,
+      "famA_kpconv": 1.0,
+      "famA_ptv3": 0.7473
+     },
+     "famA_ptv3": {
+      "normalsfix": 0.736,
+      "famA_kpconv": 0.7473,
+      "famA_ptv3": 1.0
+     }
+    }
+   },
+   "mean_offdiag_correlation": {
+    "tangent_t": 0.8458,
+    "across_b": 0.8226,
+    "normal_n": 0.751
+   }
+  },
+  "separate": {
+   "members": {
+    "normalsfix#s0": {
+     "spec": "normalsfix",
+     "seeds": [
+      0
+     ],
+     "per_fold_MLE": {
+      "0": 1.28,
+      "1": 1.2444,
+      "2": 1.3296,
+      "3": 1.1838,
+      "4": 1.3049
+     }
+    },
+    "normalsfix#s1": {
+     "spec": "normalsfix",
+     "seeds": [
+      1
+     ],
+     "per_fold_MLE": {
+      "0": 1.258,
+      "1": 1.2653,
+      "2": 1.3035,
+      "3": 1.2411,
+      "4": 1.2963
+     }
+    },
+    "normalsfix#s2": {
+     "spec": "normalsfix",
+     "seeds": [
+      2
+     ],
+     "per_fold_MLE": {
+      "0": 1.2577,
+      "1": 1.2416,
+      "2": 1.3206,
+      "3": 1.2122,
+      "4": 1.3053
+     }
+    },
+    "famA_kpconv": {
+     "spec": "famA_kpconv",
+     "seeds": [],
+     "seedless": true,
+     "per_fold_MLE": {
+      "0": 1.2964,
+      "1": 1.2213,
+      "2": 1.3589,
+      "3": 1.262,
+      "4": 1.3018
+     }
+    },
+    "famA_ptv3": {
+     "spec": "famA_ptv3",
+     "seeds": [],
+     "seedless": true,
+     "per_fold_MLE": {
+      "0": 1.3291,
+      "1": 1.2278,
+      "2": 1.3586,
+      "3": 1.2691,
+      "4": 1.3066
+     }
+    }
+   },
+   "n_members": 5,
+   "best_single": "normalsfix#s2",
+   "per_member_pooled_OOF_mm": {
+    "normalsfix#s0": 1.2685,
+    "normalsfix#s1": 1.2728,
+    "normalsfix#s2": 1.2675,
+    "famA_kpconv": 1.2881,
+    "famA_ptv3": 1.2982
+   },
+   "equal_weight": {
+    "MLE_mm": 1.1937,
+    "per_contour_MLE_mm": {
+     "outer_helix": 1.2661,
+     "concha": 0.937,
+     "inner_helix": 1.4865,
+     "sup._antihelix": 1.1973
+    },
+    "directional_rmse_mm": {
+     "tangent_t": 1.358,
+     "across_b": 0.6363,
+     "normal_n": 0.2187
+    },
+    "bootstrap_vs_best_single": {
+     "delta_mm": -0.0738,
+     "ci95": [
+      -0.0871,
+      -0.0606
+     ],
+     "p_negative": 1.0
+    }
+   },
+   "schemes": {
+    "mle/global": {
+     "objective": "mle",
+     "scheme": "global",
+     "n_weights": 5,
+     "nested_MLE_mm": 1.1933,
+     "LEAKY_in_sample_MLE_mm": 1.1918,
+     "optimism_mm": 0.0015,
+     "delta_vs_equal_weight_mm": -0.0005,
+     "per_contour_MLE_mm": {
+      "outer_helix": 1.2663,
+      "concha": 0.9358,
+      "inner_helix": 1.4862,
+      "sup._antihelix": 1.197
+     },
+     "directional_rmse_mm": {
+      "tangent_t": 1.3585,
+      "across_b": 0.6365,
+      "normal_n": 0.2172
+     },
+     "weights_LEAKY": {
+      "normalsfix#s0": [
+       0.1419
+      ],
+      "normalsfix#s1": [
+       0.1709
+      ],
+      "normalsfix#s2": [
+       0.1712
+      ],
+      "famA_kpconv": [
+       0.2686
+      ],
+      "famA_ptv3": [
+       0.2473
+      ]
+     },
+     "weights_nested_mean": {
+      "normalsfix#s0": [
+       0.1417
+      ],
+      "normalsfix#s1": [
+       0.1707
+      ],
+      "normalsfix#s2": [
+       0.1714
+      ],
+      "famA_kpconv": [
+       0.2688
+      ],
+      "famA_ptv3": [
+       0.2474
+      ]
+     },
+     "weights_nested_sd": {
+      "normalsfix#s0": [
+       0.03
+      ],
+      "normalsfix#s1": [
+       0.0212
+      ],
+      "normalsfix#s2": [
+       0.0141
+      ],
+      "famA_kpconv": [
+       0.0137
+      ],
+      "famA_ptv3": [
+       0.0157
+      ]
+     },
+     "group_layout": [
+      [
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0
+      ]
+     ],
+     "bootstrap_vs_equal_weight": {
+      "delta_mm": -0.0005,
+      "ci95": [
+       -0.0029,
+       0.002
+      ],
+      "p_negative": 0.6464,
+      "verdict": "INDISTINGUISHABLE"
+     }
+    },
+    "mle/contour": {
+     "objective": "mle",
+     "scheme": "contour",
+     "n_weights": 20,
+     "nested_MLE_mm": 1.1953,
+     "LEAKY_in_sample_MLE_mm": 1.1907,
+     "optimism_mm": 0.0046,
+     "delta_vs_equal_weight_mm": 0.0016,
+     "per_contour_MLE_mm": {
+      "outer_helix": 1.2671,
+      "concha": 0.9373,
+      "inner_helix": 1.4918,
+      "sup._antihelix": 1.1968
+     },
+     "directional_rmse_mm": {
+      "tangent_t": 1.3613,
+      "across_b": 0.636,
+      "normal_n": 0.218
+     },
+     "weights_LEAKY": {
+      "normalsfix#s0": [
+       0.2076,
+       0.1052,
+       0.1116,
+       0.1098
+      ],
+      "normalsfix#s1": [
+       0.1663,
+       0.1738,
+       0.2301,
+       0.0778
+      ],
+      "normalsfix#s2": [
+       0.1253,
+       0.1785,
+       0.1181,
+       0.3509
+      ],
+      "famA_kpconv": [
+       0.2204,
+       0.322,
+       0.2862,
+       0.2521
+      ],
+      "famA_ptv3": [
+       0.2803,
+       0.2205,
+       0.254,
+       0.2095
+      ]
+     },
+     "weights_nested_mean": {
+      "normalsfix#s0": [
+       0.2064,
+       0.1058,
+       0.1109,
+       0.1093
+      ],
+      "normalsfix#s1": [
+       0.1661,
+       0.1743,
+       0.2309,
+       0.0788
+      ],
+      "normalsfix#s2": [
+       0.1262,
+       0.1778,
+       0.1184,
+       0.3513
+      ],
+      "famA_kpconv": [
+       0.2207,
+       0.3218,
+       0.2844,
+       0.2534
+      ],
+      "famA_ptv3": [
+       0.2807,
+       0.2202,
+       0.2554,
+       0.2072
+      ]
+     },
+     "weights_nested_sd": {
+      "normalsfix#s0": [
+       0.0462,
+       0.0382,
+       0.0678,
+       0.0342
+      ],
+      "normalsfix#s1": [
+       0.0187,
+       0.0332,
+       0.0654,
+       0.0235
+      ],
+      "normalsfix#s2": [
+       0.0321,
+       0.0253,
+       0.03,
+       0.0387
+      ],
+      "famA_kpconv": [
+       0.0214,
+       0.0106,
+       0.0418,
+       0.0165
+      ],
+      "famA_ptv3": [
+       0.0232,
+       0.0375,
+       0.0282,
+       0.0307
+      ]
+     },
+     "group_layout": [
+      [
+       0,
+       0,
+       0
+      ],
+      [
+       1,
+       1,
+       1
+      ],
+      [
+       2,
+       2,
+       2
+      ],
+      [
+       3,
+       3,
+       3
+      ]
+     ],
+     "bootstrap_vs_equal_weight": {
+      "delta_mm": 0.0016,
+      "ci95": [
+       -0.0012,
+       0.0046
+      ],
+      "p_negative": 0.1359,
+      "verdict": "INDISTINGUISHABLE"
+     }
+    },
+    "mle/direction": {
+     "objective": "mle",
+     "scheme": "direction",
+     "n_weights": 15,
+     "nested_MLE_mm": 1.1922,
+     "LEAKY_in_sample_MLE_mm": 1.1901,
+     "optimism_mm": 0.002,
+     "delta_vs_equal_weight_mm": -0.0015,
+     "per_contour_MLE_mm": {
+      "outer_helix": 1.2644,
+      "concha": 0.9347,
+      "inner_helix": 1.4862,
+      "sup._antihelix": 1.1959
+     },
+     "directional_rmse_mm": {
+      "tangent_t": 1.3586,
+      "across_b": 0.6355,
+      "normal_n": 0.2181
+     },
+     "weights_LEAKY": {
+      "normalsfix#s0": [
+       0.15,
+       0.1569,
+       0.0618
+      ],
+      "normalsfix#s1": [
+       0.1871,
+       0.1206,
+       0.0995
+      ],
+      "normalsfix#s2": [
+       0.1761,
+       0.1804,
+       0.0637
+      ],
+      "famA_kpconv": [
+       0.2222,
+       0.3743,
+       0.4995
+      ],
+      "famA_ptv3": [
+       0.2645,
+       0.1677,
+       0.2754
+      ]
+     },
+     "weights_nested_mean": {
+      "normalsfix#s0": [
+       0.1494,
+       0.1571,
+       0.0617
+      ],
+      "normalsfix#s1": [
+       0.1869,
+       0.12,
+       0.0992
+      ],
+      "normalsfix#s2": [
+       0.1763,
+       0.1807,
+       0.0636
+      ],
+      "famA_kpconv": [
+       0.2225,
+       0.3741,
+       0.4988
+      ],
+      "famA_ptv3": [
+       0.265,
+       0.1681,
+       0.2767
+      ]
+     },
+     "weights_nested_sd": {
+      "normalsfix#s0": [
+       0.0335,
+       0.0279,
+       0.0168
+      ],
+      "normalsfix#s1": [
+       0.0309,
+       0.0104,
+       0.0131
+      ],
+      "normalsfix#s2": [
+       0.0175,
+       0.0122,
+       0.005
+      ],
+      "famA_kpconv": [
+       0.0154,
+       0.02,
+       0.0218
+      ],
+      "famA_ptv3": [
+       0.023,
+       0.0152,
+       0.0256
+      ]
+     },
+     "group_layout": [
+      [
+       0,
+       1,
+       2
+      ],
+      [
+       0,
+       1,
+       2
+      ],
+      [
+       0,
+       1,
+       2
+      ],
+      [
+       0,
+       1,
+       2
+      ]
+     ],
+     "bootstrap_vs_equal_weight": {
+      "delta_mm": -0.0015,
+      "ci95": [
+       -0.0038,
+       0.0008
+      ],
+      "p_negative": 0.9006,
+      "verdict": "INDISTINGUISHABLE"
+     }
+    },
+    "mle/contour_x_direction": {
+     "objective": "mle",
+     "scheme": "contour_x_direction",
+     "n_weights": 60,
+     "nested_MLE_mm": 1.195,
+     "LEAKY_in_sample_MLE_mm": 1.1883,
+     "optimism_mm": 0.0066,
+     "delta_vs_equal_weight_mm": 0.0012,
+     "per_contour_MLE_mm": {
+      "outer_helix": 1.2661,
+      "concha": 0.937,
+      "inner_helix": 1.4934,
+      "sup._antihelix": 1.1942
+     },
+     "directional_rmse_mm": {
+      "tangent_t": 1.3627,
+      "across_b": 0.634,
+      "normal_n": 0.2182
+     },
+     "weights_LEAKY": {
+      "normalsfix#s0": [
+       0.2251,
+       0.2311,
+       0.0475,
+       0.0813,
+       0.1581,
+       0.0821,
+       0.123,
+       0.0702,
+       0.051,
+       0.1608,
+       0.0377,
+       0.0244
+      ],
+      "normalsfix#s1": [
+       0.1419,
+       0.2363,
+       0.0502,
+       0.2003,
+       0.1179,
+       0.1232,
+       0.2388,
+       0.1946,
+       0.1368,
+       0.15,
+       0.0,
+       0.0709
+      ],
+      "normalsfix#s2": [
+       0.1371,
+       0.0832,
+       0.0559,
+       0.2146,
+       0.1347,
+       0.0815,
+       0.1208,
+       0.116,
+       0.0308,
+       0.3117,
+       0.4309,
+       0.0745
+      ],
+      "famA_kpconv": [
+       0.1698,
+       0.3361,
+       0.5063,
+       0.2575,
+       0.4445,
+       0.4855,
+       0.26,
+       0.409,
+       0.533,
+       0.2085,
+       0.2965,
+       0.4226
+      ],
+      "famA_ptv3": [
+       0.3261,
+       0.1133,
+       0.3401,
+       0.2464,
+       0.1448,
+       0.2277,
+       0.2574,
+       0.2102,
+       0.2484,
+       0.1689,
+       0.2348,
+       0.4075
+      ]
+     },
+     "weights_nested_mean": {
+      "normalsfix#s0": [
+       0.2247,
+       0.2305,
+       0.0464,
+       0.0829,
+       0.1581,
+       0.0823,
+       0.1222,
+       0.0684,
+       0.0552,
+       0.1608,
+       0.0383,
+       0.0249
+      ],
+      "normalsfix#s1": [
+       0.1412,
+       0.2356,
+       0.0508,
+       0.2004,
+       0.1171,
+       0.1224,
+       0.2407,
+       0.1937,
+       0.1356,
+       0.1525,
+       0.0,
+       0.0713
+      ],
+      "normalsfix#s2": [
+       0.1374,
+       0.0853,
+       0.0564,
+       0.2136,
+       0.1361,
+       0.0813,
+       0.1203,
+       0.1178,
+       0.0283,
+       0.309,
+       0.4317,
+       0.0735
+      ],
+      "famA_kpconv": [
+       0.1695,
+       0.3345,
+       0.5053,
+       0.258,
+       0.4433,
+       0.4847,
+       0.2565,
+       0.4096,
+       0.533,
+       0.2113,
+       0.2958,
+       0.4242
+      ],
+      "famA_ptv3": [
+       0.3273,
+       0.1142,
+       0.3411,
+       0.2451,
+       0.1454,
+       0.2294,
+       0.2602,
+       0.2105,
+       0.248,
+       0.1665,
+       0.2342,
+       0.4061
+      ]
+     },
+     "weights_nested_sd": {
+      "normalsfix#s0": [
+       0.0657,
+       0.0372,
+       0.0124,
+       0.0432,
+       0.0444,
+       0.0142,
+       0.0817,
+       0.0485,
+       0.0338,
+       0.0561,
+       0.0334,
+       0.0187
+      ],
+      "normalsfix#s1": [
+       0.0295,
+       0.0204,
+       0.0189,
+       0.0545,
+       0.0262,
+       0.0209,
+       0.083,
+       0.0338,
+       0.0315,
+       0.0493,
+       0.0,
+       0.0228
+      ],
+      "normalsfix#s2": [
+       0.0504,
+       0.0141,
+       0.0212,
+       0.0374,
+       0.0243,
+       0.0216,
+       0.0357,
+       0.0172,
+       0.0083,
+       0.044,
+       0.0326,
+       0.0384
+      ],
+      "famA_kpconv": [
+       0.0289,
+       0.0239,
+       0.0195,
+       0.0148,
+       0.0241,
+       0.0324,
+       0.0456,
+       0.054,
+       0.0445,
+       0.0263,
+       0.0199,
+       0.0316
+      ],
+      "famA_ptv3": [
+       0.0389,
+       0.0147,
+       0.0251,
+       0.0462,
+       0.0312,
+       0.0435,
+       0.0371,
+       0.0307,
+       0.0246,
+       0.034,
+       0.0277,
+       0.0454
+      ]
+     },
+     "group_layout": [
+      [
+       0,
+       1,
+       2
+      ],
+      [
+       3,
+       4,
+       5
+      ],
+      [
+       6,
+       7,
+       8
+      ],
+      [
+       9,
+       10,
+       11
+      ]
+     ],
+     "bootstrap_vs_equal_weight": {
+      "delta_mm": 0.0012,
+      "ci95": [
+       -0.0018,
+       0.0043
+      ],
+      "p_negative": 0.2147,
+      "verdict": "INDISTINGUISHABLE"
+     }
+    },
+    "mse/global": {
+     "objective": "mse",
+     "scheme": "global",
+     "n_weights": 5,
+     "nested_MLE_mm": 1.1942,
+     "LEAKY_in_sample_MLE_mm": 1.1923,
+     "optimism_mm": 0.0019,
+     "delta_vs_equal_weight_mm": 0.0005,
+     "per_contour_MLE_mm": {
+      "outer_helix": 1.2662,
+      "concha": 0.9369,
+      "inner_helix": 1.487,
+      "sup._antihelix": 1.2005
+     },
+     "directional_rmse_mm": {
+      "tangent_t": 1.3586,
+      "across_b": 0.6374,
+      "normal_n": 0.2176
+     },
+     "weights_LEAKY": {
+      "normalsfix#s0": [
+       0.1588
+      ],
+      "normalsfix#s1": [
+       0.2252
+      ],
+      "normalsfix#s2": [
+       0.1106
+      ],
+      "famA_kpconv": [
+       0.2485
+      ],
+      "famA_ptv3": [
+       0.2569
+      ]
+     },
+     "weights_nested_mean": {
+      "normalsfix#s0": [
+       0.1582
+      ],
+      "normalsfix#s1": [
+       0.2256
+      ],
+      "normalsfix#s2": [
+       0.1106
+      ],
+      "famA_kpconv": [
+       0.2484
+      ],
+      "famA_ptv3": [
+       0.2572
+      ]
+     },
+     "weights_nested_sd": {
+      "normalsfix#s0": [
+       0.0315
+      ],
+      "normalsfix#s1": [
+       0.0288
+      ],
+      "normalsfix#s2": [
+       0.0183
+      ],
+      "famA_kpconv": [
+       0.0234
+      ],
+      "famA_ptv3": [
+       0.0229
+      ]
+     },
+     "group_layout": [
+      [
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0
+      ],
+      [
+       0,
+       0,
+       0
+      ]
+     ],
+     "bootstrap_vs_equal_weight": {
+      "delta_mm": 0.0005,
+      "ci95": [
+       -0.0021,
+       0.0032
+      ],
+      "p_negative": 0.3562,
+      "verdict": "INDISTINGUISHABLE"
+     }
+    },
+    "mse/contour": {
+     "objective": "mse",
+     "scheme": "contour",
+     "n_weights": 20,
+     "nested_MLE_mm": 1.1968,
+     "LEAKY_in_sample_MLE_mm": 1.1918,
+     "optimism_mm": 0.005,
+     "delta_vs_equal_weight_mm": 0.003,
+     "per_contour_MLE_mm": {
+      "outer_helix": 1.2675,
+      "concha": 0.9388,
+      "inner_helix": 1.4952,
+      "sup._antihelix": 1.197
+     },
+     "directional_rmse_mm": {
+      "tangent_t": 1.3627,
+      "across_b": 0.6362,
+      "normal_n": 0.2186
+     },
+     "weights_LEAKY": {
+      "normalsfix#s0": [
+       0.2419,
+       0.1859,
+       0.0602,
+       0.1207
+      ],
+      "normalsfix#s1": [
+       0.2023,
+       0.129,
+       0.3306,
+       0.1303
+      ],
+      "normalsfix#s2": [
+       0.0549,
+       0.1919,
+       0.0447,
+       0.3228
+      ],
+      "famA_kpconv": [
+       0.2332,
+       0.2946,
+       0.238,
+       0.2234
+      ],
+      "famA_ptv3": [
+       0.2677,
+       0.1986,
+       0.3265,
+       0.2028
+      ]
+     },
+     "weights_nested_mean": {
+      "normalsfix#s0": [
+       0.2412,
+       0.1851,
+       0.0536,
+       0.1209
+      ],
+      "normalsfix#s1": [
+       0.2026,
+       0.1307,
+       0.3282,
+       0.131
+      ],
+      "normalsfix#s2": [
+       0.055,
+       0.1908,
+       0.0555,
+       0.3236
+      ],
+      "famA_kpconv": [
+       0.2337,
+       0.292,
+       0.2375,
+       0.2235
+      ],
+      "famA_ptv3": [
+       0.2675,
+       0.2013,
+       0.3251,
+       0.201
+      ]
+     },
+     "weights_nested_sd": {
+      "normalsfix#s0": [
+       0.0493,
+       0.0555,
+       0.0606,
+       0.0339
+      ],
+      "normalsfix#s1": [
+       0.0293,
+       0.0471,
+       0.0669,
+       0.0275
+      ],
+      "normalsfix#s2": [
+       0.0328,
+       0.0205,
+       0.0495,
+       0.0322
+      ],
+      "famA_kpconv": [
+       0.0177,
+       0.0157,
+       0.0696,
+       0.0228
+      ],
+      "famA_ptv3": [
+       0.022,
+       0.0485,
+       0.043,
+       0.0304
+      ]
+     },
+     "group_layout": [
+      [
+       0,
+       0,
+       0
+      ],
+      [
+       1,
+       1,
+       1
+      ],
+      [
+       2,
+       2,
+       2
+      ],
+      [
+       3,
+       3,
+       3
+      ]
+     ],
+     "bootstrap_vs_equal_weight": {
+      "delta_mm": 0.003,
+      "ci95": [
+       -0.0008,
+       0.0069
+      ],
+      "p_negative": 0.0591,
+      "verdict": "INDISTINGUISHABLE"
+     }
+    },
+    "mse/direction": {
+     "objective": "mse",
+     "scheme": "direction",
+     "n_weights": 15,
+     "nested_MLE_mm": 1.1938,
+     "LEAKY_in_sample_MLE_mm": 1.1912,
+     "optimism_mm": 0.0026,
+     "delta_vs_equal_weight_mm": 0.0001,
+     "per_contour_MLE_mm": {
+      "outer_helix": 1.2655,
+      "concha": 0.9362,
+      "inner_helix": 1.4873,
+      "sup._antihelix": 1.2002
+     },
+     "directional_rmse_mm": {
+      "tangent_t": 1.3593,
+      "across_b": 0.6363,
+      "normal_n": 0.2172
+     },
+     "weights_LEAKY": {
+      "normalsfix#s0": [
+       0.1385,
+       0.2379,
+       0.1179
+      ],
+      "normalsfix#s1": [
+       0.2548,
+       0.1071,
+       0.1811
+      ],
+      "normalsfix#s2": [
+       0.0965,
+       0.1707,
+       0.0892
+      ],
+      "famA_kpconv": [
+       0.2227,
+       0.3366,
+       0.4023
+      ],
+      "famA_ptv3": [
+       0.2876,
+       0.1476,
+       0.2095
+      ]
+     },
+     "weights_nested_mean": {
+      "normalsfix#s0": [
+       0.1381,
+       0.2348,
+       0.1165
+      ],
+      "normalsfix#s1": [
+       0.2548,
+       0.1081,
+       0.1804
+      ],
+      "normalsfix#s2": [
+       0.0965,
+       0.1729,
+       0.088
+      ],
+      "famA_kpconv": [
+       0.2228,
+       0.334,
+       0.4029
+      ],
+      "famA_ptv3": [
+       0.2878,
+       0.1501,
+       0.2122
+      ]
+     },
+     "weights_nested_sd": {
+      "normalsfix#s0": [
+       0.0311,
+       0.0613,
+       0.0281
+      ],
+      "normalsfix#s1": [
+       0.0388,
+       0.0236,
+       0.0251
+      ],
+      "normalsfix#s2": [
+       0.0245,
+       0.0322,
+       0.0122
+      ],
+      "famA_kpconv": [
+       0.027,
+       0.0224,
+       0.0382
+      ],
+      "famA_ptv3": [
+       0.0312,
+       0.026,
+       0.0323
+      ]
+     },
+     "group_layout": [
+      [
+       0,
+       1,
+       2
+      ],
+      [
+       0,
+       1,
+       2
+      ],
+      [
+       0,
+       1,
+       2
+      ],
+      [
+       0,
+       1,
+       2
+      ]
+     ],
+     "bootstrap_vs_equal_weight": {
+      "delta_mm": 0.0001,
+      "ci95": [
+       -0.003,
+       0.0033
+      ],
+      "p_negative": 0.4807,
+      "verdict": "INDISTINGUISHABLE"
+     }
+    },
+    "mse/contour_x_direction": {
+     "objective": "mse",
+     "scheme": "contour_x_direction",
+     "n_weights": 60,
+     "nested_MLE_mm": 1.1965,
+     "LEAKY_in_sample_MLE_mm": 1.19,
+     "optimism_mm": 0.0065,
+     "delta_vs_equal_weight_mm": 0.0027,
+     "per_contour_MLE_mm": {
+      "outer_helix": 1.2663,
+      "concha": 0.9388,
+      "inner_helix": 1.4957,
+      "sup._antihelix": 1.1965
+     },
+     "directional_rmse_mm": {
+      "tangent_t": 1.3635,
+      "across_b": 0.634,
+      "normal_n": 0.2174
+     },
+     "weights_LEAKY": {
+      "normalsfix#s0": [
+       0.2543,
+       0.2448,
+       0.0476,
+       0.1029,
+       0.3204,
+       0.2084,
+       0.0646,
+       0.0,
+       0.0735,
+       0.1127,
+       0.098,
+       0.0258
+      ],
+      "normalsfix#s1": [
+       0.1747,
+       0.2932,
+       0.1023,
+       0.1833,
+       0.0115,
+       0.2166,
+       0.3347,
+       0.2688,
+       0.2447,
+       0.255,
+       0.0,
+       0.0483
+      ],
+      "normalsfix#s2": [
+       0.056,
+       0.0549,
+       0.0438,
+       0.2197,
+       0.1457,
+       0.1189,
+       0.0358,
+       0.129,
+       0.0424,
+       0.2626,
+       0.4196,
+       0.1222
+      ],
+      "famA_kpconv": [
+       0.2125,
+       0.2835,
+       0.4706,
+       0.2297,
+       0.436,
+       0.3127,
+       0.2239,
+       0.4055,
+       0.4414,
+       0.2309,
+       0.1891,
+       0.4503
+      ],
+      "famA_ptv3": [
+       0.3026,
+       0.1236,
+       0.3356,
+       0.2645,
+       0.0864,
+       0.1434,
+       0.341,
+       0.1967,
+       0.1979,
+       0.1387,
+       0.2933,
+       0.3534
+      ]
+     },
+     "weights_nested_mean": {
+      "normalsfix#s0": [
+       0.2526,
+       0.242,
+       0.0467,
+       0.1043,
+       0.308,
+       0.2049,
+       0.0561,
+       0.0175,
+       0.0719,
+       0.1129,
+       0.0984,
+       0.0243
+      ],
+      "normalsfix#s1": [
+       0.1748,
+       0.2902,
+       0.1028,
+       0.1829,
+       0.0259,
+       0.2133,
+       0.3312,
+       0.2635,
+       0.2446,
+       0.2558,
+       0.0,
+       0.0497
+      ],
+      "normalsfix#s2": [
+       0.058,
+       0.0618,
+       0.0439,
+       0.2185,
+       0.1429,
+       0.1127,
+       0.0501,
+       0.1226,
+       0.0427,
+       0.263,
+       0.42,
+       0.1222
+      ],
+      "famA_kpconv": [
+       0.2124,
+       0.282,
+       0.47,
+       0.2301,
+       0.4282,
+       0.3192,
+       0.2229,
+       0.4021,
+       0.4435,
+       0.2315,
+       0.1884,
+       0.4501
+      ],
+      "famA_ptv3": [
+       0.3021,
+       0.1239,
+       0.3366,
+       0.2641,
+       0.095,
+       0.15,
+       0.3396,
+       0.1943,
+       0.1973,
+       0.1368,
+       0.2932,
+       0.3537
+      ]
+     },
+     "weights_nested_sd": {
+      "normalsfix#s0": [
+       0.0683,
+       0.0485,
+       0.0166,
+       0.0341,
+       0.0801,
+       0.0376,
+       0.063,
+       0.0259,
+       0.0492,
+       0.0729,
+       0.0341,
+       0.0137
+      ],
+      "normalsfix#s1": [
+       0.0368,
+       0.0132,
+       0.0273,
+       0.0588,
+       0.0361,
+       0.0445,
+       0.0777,
+       0.0573,
+       0.0645,
+       0.059,
+       0.0001,
+       0.0363
+      ],
+      "normalsfix#s2": [
+       0.0538,
+       0.0489,
+       0.0298,
+       0.0298,
+       0.0126,
+       0.0396,
+       0.0508,
+       0.0305,
+       0.0127,
+       0.0368,
+       0.0332,
+       0.0415
+      ],
+      "famA_kpconv": [
+       0.0196,
+       0.0235,
+       0.0125,
+       0.0236,
+       0.0308,
+       0.0751,
+       0.0716,
+       0.0538,
+       0.0636,
+       0.0415,
+       0.02,
+       0.03
+      ],
+      "famA_ptv3": [
+       0.032,
+       0.015,
+       0.0212,
+       0.041,
+       0.0574,
+       0.0494,
+       0.0505,
+       0.0349,
+       0.0248,
+       0.0409,
+       0.0193,
+       0.0692
+      ]
+     },
+     "group_layout": [
+      [
+       0,
+       1,
+       2
+      ],
+      [
+       3,
+       4,
+       5
+      ],
+      [
+       6,
+       7,
+       8
+      ],
+      [
+       9,
+       10,
+       11
+      ]
+     ],
+     "bootstrap_vs_equal_weight": {
+      "delta_mm": 0.0027,
+      "ci95": [
+       -0.0013,
+       0.0069
+      ],
+      "p_negative": 0.0931,
+      "verdict": "INDISTINGUISHABLE"
+     }
+    }
+   },
+   "disjointness": [
+    {
+     "outer_fold": 0,
+     "n_fit_ears": 272,
+     "n_eval_ears": 68,
+     "ear_overlap": 0,
+     "subject_overlap": 0,
+     "in_fit_MLE_mm": 1.1898,
+     "held_out_MLE_mm": 1.2008
+    },
+    {
+     "outer_fold": 1,
+     "n_fit_ears": 272,
+     "n_eval_ears": 68,
+     "ear_overlap": 0,
+     "subject_overlap": 0,
+     "in_fit_MLE_mm": 1.2021,
+     "held_out_MLE_mm": 1.152
+    },
+    {
+     "outer_fold": 2,
+     "n_fit_ears": 272,
+     "n_eval_ears": 68,
+     "ear_overlap": 0,
+     "subject_overlap": 0,
+     "in_fit_MLE_mm": 1.1782,
+     "held_out_MLE_mm": 1.2464
+    },
+    {
+     "outer_fold": 3,
+     "n_fit_ears": 272,
+     "n_eval_ears": 68,
+     "ear_overlap": 0,
+     "subject_overlap": 0,
+     "in_fit_MLE_mm": 1.2035,
+     "held_out_MLE_mm": 1.1462
+    },
+    {
+     "outer_fold": 4,
+     "n_fit_ears": 272,
+     "n_eval_ears": 68,
+     "ear_overlap": 0,
+     "subject_overlap": 0,
+     "in_fit_MLE_mm": 1.1846,
+     "held_out_MLE_mm": 1.2208
+    }
+   ],
+   "geometry": {
+    "box_containment_slack_mm": -0.0018844464348148904,
+    "dist_to_equal_weight_point_mm": {
+     "mean": 0.1104,
+     "median": 0.093,
+     "p90": 0.1972,
+     "max": 2.3363
+    },
+    "dist_to_nearest_member_mm": {
+     "mean": 0.2071,
+     "median": 0.1794,
+     "p90": 0.3596,
+     "max": 5.2006
+    },
+    "dist_of_equal_weight_to_nearest_member_mm": {
+     "mean": 0.1908,
+     "median": 0.1665,
+     "p90": 0.3322,
+     "max": 4.5158
+    },
+    "member_spread_mm": {
+     "mean": 1.2953,
+     "median": 1.1584,
+     "p90": 2.1452,
+     "max": 14.6334
+    },
+    "dist_to_member_convex_hull_mm": {
+     "mean": 0.0092,
+     "median": 0.0,
+     "p90": 0.0304,
+     "max": 0.2213,
+     "n_sampled": 2000,
+     "frac_outside_1e-6": 0.3785
+    },
+    "ratio_travel_to_spread": 0.0905
+   },
+   "signed_residual_correlation": {
+    "tangent_t": {
+     "normalsfix#s0": {
+      "normalsfix#s0": 1.0,
+      "normalsfix#s1": 0.9141,
+      "normalsfix#s2": 0.9257,
+      "famA_kpconv": 0.8425,
+      "famA_ptv3": 0.8398
+     },
+     "normalsfix#s1": {
+      "normalsfix#s0": 0.9141,
+      "normalsfix#s1": 1.0,
+      "normalsfix#s2": 0.9166,
+      "famA_kpconv": 0.8321,
+      "famA_ptv3": 0.8324
+     },
+     "normalsfix#s2": {
+      "normalsfix#s0": 0.9257,
+      "normalsfix#s1": 0.9166,
+      "normalsfix#s2": 1.0,
+      "famA_kpconv": 0.84,
+      "famA_ptv3": 0.8354
+     },
+     "famA_kpconv": {
+      "normalsfix#s0": 0.8425,
+      "normalsfix#s1": 0.8321,
+      "normalsfix#s2": 0.84,
+      "famA_kpconv": 1.0,
+      "famA_ptv3": 0.816
+     },
+     "famA_ptv3": {
+      "normalsfix#s0": 0.8398,
+      "normalsfix#s1": 0.8324,
+      "normalsfix#s2": 0.8354,
+      "famA_kpconv": 0.816,
+      "famA_ptv3": 1.0
+     }
+    },
+    "across_b": {
+     "normalsfix#s0": {
+      "normalsfix#s0": 1.0,
+      "normalsfix#s1": 0.8967,
+      "normalsfix#s2": 0.9002,
+      "famA_kpconv": 0.8218,
+      "famA_ptv3": 0.8012
+     },
+     "normalsfix#s1": {
+      "normalsfix#s0": 0.8967,
+      "normalsfix#s1": 1.0,
+      "normalsfix#s2": 0.9033,
+      "famA_kpconv": 0.8183,
+      "famA_ptv3": 0.7974
+     },
+     "normalsfix#s2": {
+      "normalsfix#s0": 0.9002,
+      "normalsfix#s1": 0.9033,
+      "normalsfix#s2": 1.0,
+      "famA_kpconv": 0.8171,
+      "famA_ptv3": 0.8007
+     },
+     "famA_kpconv": {
+      "normalsfix#s0": 0.8218,
+      "normalsfix#s1": 0.8183,
+      "normalsfix#s2": 0.8171,
+      "famA_kpconv": 1.0,
+      "famA_ptv3": 0.7922
+     },
+     "famA_ptv3": {
+      "normalsfix#s0": 0.8012,
+      "normalsfix#s1": 0.7974,
+      "normalsfix#s2": 0.8007,
+      "famA_kpconv": 0.7922,
+      "famA_ptv3": 1.0
+     }
+    },
+    "normal_n": {
+     "normalsfix#s0": {
+      "normalsfix#s0": 1.0,
+      "normalsfix#s1": 0.835,
+      "normalsfix#s2": 0.8476,
+      "famA_kpconv": 0.7242,
+      "famA_ptv3": 0.6948
+     },
+     "normalsfix#s1": {
+      "normalsfix#s0": 0.835,
+      "normalsfix#s1": 1.0,
+      "normalsfix#s2": 0.8442,
+      "famA_kpconv": 0.7216,
+      "famA_ptv3": 0.6904
+     },
+     "normalsfix#s2": {
+      "normalsfix#s0": 0.8476,
+      "normalsfix#s1": 0.8442,
+      "normalsfix#s2": 1.0,
+      "famA_kpconv": 0.7382,
+      "famA_ptv3": 0.7034
+     },
+     "famA_kpconv": {
+      "normalsfix#s0": 0.7242,
+      "normalsfix#s1": 0.7216,
+      "normalsfix#s2": 0.7382,
+      "famA_kpconv": 1.0,
+      "famA_ptv3": 0.7473
+     },
+     "famA_ptv3": {
+      "normalsfix#s0": 0.6948,
+      "normalsfix#s1": 0.6904,
+      "normalsfix#s2": 0.7034,
+      "famA_kpconv": 0.7473,
+      "famA_ptv3": 1.0
+     }
+    }
+   },
+   "mean_offdiag_correlation": {
+    "tangent_t": 0.8594,
+    "across_b": 0.8349,
+    "normal_n": 0.7547
+   }
+  }
+ },
+ "seed_splitting": {
+  "equal_weight_seed_mean_mm": 1.1952,
+  "equal_weight_seeds_split_mm": 1.1937,
+  "equal_weight_delta_mm": -0.0015,
+  "per_scheme": [
+   {
+    "scheme": "mle/global",
+    "seed_mean": 1.1927,
+    "seeds_split": 1.1933,
+    "delta_mm": 0.0006
+   },
+   {
+    "scheme": "mle/contour",
+    "seed_mean": 1.1939,
+    "seeds_split": 1.1953,
+    "delta_mm": 0.0014
+   },
+   {
+    "scheme": "mle/direction",
+    "seed_mean": 1.1915,
+    "seeds_split": 1.1922,
+    "delta_mm": 0.0007
+   },
+   {
+    "scheme": "mle/contour_x_direction",
+    "seed_mean": 1.1929,
+    "seeds_split": 1.195,
+    "delta_mm": 0.0021
+   },
+   {
+    "scheme": "mse/global",
+    "seed_mean": 1.1932,
+    "seeds_split": 1.1942,
+    "delta_mm": 0.001
+   },
+   {
+    "scheme": "mse/contour",
+    "seed_mean": 1.1951,
+    "seeds_split": 1.1968,
+    "delta_mm": 0.0017
+   },
+   {
+    "scheme": "mse/direction",
+    "seed_mean": 1.1925,
+    "seeds_split": 1.1938,
+    "delta_mm": 0.0013
+   },
+   {
+    "scheme": "mse/contour_x_direction",
+    "seed_mean": 1.1945,
+    "seeds_split": 1.1965,
+    "delta_mm": 0.002
+   }
+  ],
+  "equal_weight_bootstrap": {
+   "delta_mm": -0.0015,
+   "ci95": [
+    -0.007,
+    0.0039
+   ],
+   "p_negative": 0.7018
+  },
+  "note": "Splitting the seeds is NOT a new source of information: it re-weights the families. 3 members give dgcnn 1/3 of the equal-weight mass, 5 members give it 3/5, and dgcnn is the best family -- that alone moves the equal-weight number. The 3 seeds are near-duplicate members (see ensemble_oof.py's correlation table), so they add K*ncell fitted parameters against almost no residual diversity."
+ },
+ "headline": {
+  "equal_weight_MLE_mm": {
+   "ensemble": 1.1952,
+   "separate": 1.1937
+  },
+  "best_nested": {
+   "member_set": "ensemble",
+   "scheme": "mle/direction",
+   "MLE_mm": 1.1915,
+   "delta_vs_equal_weight_mm": -0.0037,
+   "ci95": [
+    -0.0075,
+    0.0
+   ],
+   "verdict": "INDISTINGUISHABLE"
+  }
+ },
+ "caveats": [
+  "STACKING, NOT FULL NESTING (ensemble_oof.py's caveat 1, unchanged): the weights for outer fold k are fitted only on other folds' ears -- asserted, ear-level AND subject-level -- but those ears' OOF predictions come from base models whose training folds include fold k. optimism_mm quantifies only the in-sample WEIGHT fit.",
+  "The reported best-of-all-configurations is the minimum over member sets x objectives x schemes. That selection is not covered by any bootstrap CI here. contour_x_direction was specified in advance; it is the row to read.",
+  "OBJECTIVE MISMATCH. MSE-optimal weights do beat equal weight in sample on the metric (0.0014-0.0049 mm), but they lose to MLE-optimal weights by 0.0001-0.0017 mm -- the same size as every effect measured here. Out of sample that is enough to flip the sign on 4 of the 8 nested MSE configurations. Hence OBJ=mle, with OBJ=mse reported so the mismatch is a number rather than a worry.",
+  "A per-direction combination is NOT a convex combination of the members: it is only inside their bounding box in the local frame (asserted). The measured distance to the convex hull is reported; it is small but nonzero.",
+  "NO SURFACE PROJECTION. These are raw ensemble coordinates. ensemble_final.py measures -0.0055 mm for exact surface projection on top of the equal-weight ensemble; whether the fitted-weight gain survives projection (or is absorbed by it) is UNMEASURED here.",
+  "pointnext -- the member that motivates direction-dependent weights, being best in the normal direction -- exists for FOLD 0 ONLY. It cannot enter any nested fit. The direction dependence among the three complete members is far weaker than the four-member fold-0 table suggests.",
+  "RIDGE is untuned and left at 0. Tuning it on the fit ears requires an INNER split; choosing it by the nested score would put the selection back inside the estimate."
+ ]
+}
