@@ -1,0 +1,86 @@
+{
+ "note": "Residual of a cubic parametric B-spline fitted to each contour's ordered GT landmarks. Full dof interpolates exactly, so the residual is the price of smoothing -- a floor any reduced-rank curve parameterisation pays BEFORE any learning error.",
+ "contours": {
+  "outer_helix": {
+   "n_landmarks": 25,
+   "by_dof": {
+    "~35%": {
+     "mean_mm": 1.4758,
+     "p90_mm": 2.3229,
+     "max_mm": 4.0484
+    },
+    "~60%": {
+     "mean_mm": 0.9351,
+     "p90_mm": 1.4002,
+     "max_mm": 2.4814
+    },
+    "full": {
+     "mean_mm": 0.0,
+     "p90_mm": 0.0,
+     "max_mm": 0.0
+    }
+   }
+  },
+  "concha": {
+   "n_landmarks": 30,
+   "by_dof": {
+    "~35%": {
+     "mean_mm": 1.6529,
+     "p90_mm": 2.5416,
+     "max_mm": 4.1154
+    },
+    "~60%": {
+     "mean_mm": 0.9758,
+     "p90_mm": 1.6771,
+     "max_mm": 2.7205
+    },
+    "full": {
+     "mean_mm": 0.0,
+     "p90_mm": 0.0,
+     "max_mm": 0.0
+    }
+   }
+  },
+  "inner_helix": {
+   "n_landmarks": 20,
+   "by_dof": {
+    "~35%": {
+     "mean_mm": 0.8289,
+     "p90_mm": 1.3913,
+     "max_mm": 2.6838
+    },
+    "~60%": {
+     "mean_mm": 0.7448,
+     "p90_mm": 1.1789,
+     "max_mm": 2.0331
+    },
+    "full": {
+     "mean_mm": 0.0,
+     "p90_mm": 0.0,
+     "max_mm": 0.0
+    }
+   }
+  },
+  "sup._antihelix": {
+   "n_landmarks": 10,
+   "by_dof": {
+    "~35%": {
+     "mean_mm": 0.0981,
+     "p90_mm": 0.1749,
+     "max_mm": 0.7034
+    },
+    "~60%": {
+     "mean_mm": 0.0981,
+     "p90_mm": 0.1749,
+     "max_mm": 0.7034
+    },
+    "full": {
+     "mean_mm": 0.0,
+     "p90_mm": 0.0,
+     "max_mm": 0.0
+    }
+   }
+  }
+ },
+ "conclusion": "A smooth curve carrying ~60% of the landmarks' degrees of freedom already costs up to 0.9758mm mean, comparable to the entire current error budget of 1.22mm. Family F used NCTRL=16, i.e. 64% of the outer helix's 25 landmarks and 53% of concha's 30, so it paid roughly 0.95mm of pure representation error before learning anything. That accounts for its 1.81mm and means the result does NOT refute the phase idea -- it refutes a reduced-rank curve. NCTRL >= n removes the floor entirely while keeping the structural constraint the family exists for, which is monotone ordering, not smoothness."
+}
