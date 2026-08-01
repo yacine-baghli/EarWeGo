@@ -1,0 +1,19 @@
+{
+ "experiment": "profile reparameterisation with PREDICTED anchors -- no GT anywhere",
+ "setup": "anchor indices chosen per contour from TRAINING-fold error only; population arc-length profile from training folds only; anchors keep their predicted positions; interior placed at profile positions along the predicted polyline, piecewise between consecutive anchors",
+ "pooled_oof_mm": {"base": 1.1952, "k2": 1.4272, "k3": 1.3162, "k4": 1.2953, "k6": 1.2734},
+ "per_contour_mm": {
+  "outer_helix":    {"base": 1.2686, "k2": 1.6492, "k3": 1.5093, "k4": 1.4500, "k6": 1.3982},
+  "concha":         {"base": 0.9370, "k2": 1.2607, "k3": 1.0598, "k4": 1.0518, "k6": 1.0325},
+  "inner_helix":    {"base": 1.4859, "k2": 1.5159, "k3": 1.5183, "k4": 1.5145, "k6": 1.5136},
+  "sup._antihelix": {"base": 1.2051, "k2": 1.1939, "k3": 1.1986, "k4": 1.2009, "k6": 1.2036}},
+ "verdict": "HARMFUL at every k",
+ "why": "The k=4 oracle at 0.536mm was entirely the GT anchors. Real anchors carry 1.0-2.5mm error, and reparameterising between erroneous anchors propagates that error onto interior landmarks that were individually better placed than the reparameterisation makes them.",
+ "per_landmark_floor": {
+  "best_landmark_overall_mm": 0.5657,
+  "n_under_0.6mm": 1, "n_under_0.8mm": 10, "n_under_1.0mm": 19,
+  "note": "all 10 sub-0.8mm landmarks are in CONCHA, the contour where the profile does not apply",
+  "best_per_contour_mm": {"outer_helix": 1.000, "concha": 0.566, "inner_helix": 0.986, "sup._antihelix": 1.087}},
+ "bar": "Anchors need roughly 0.57-0.83mm for the k=2 gain to survive. On inner_helix and sup._antihelix the BEST landmark any model achieves is 0.99 and 1.09mm, so no anchor currently clears the bar on the two contours where the constraint applies.",
+ "conclusion": "The arc-length profile is a real population constant (sd 0.12-0.32mm on two contours) but it is NOT exploitable at current localisation accuracy. It becomes exploitable only if selected landmarks reach sub-0.8mm, which no architecture tried here has done on those contours."
+}
