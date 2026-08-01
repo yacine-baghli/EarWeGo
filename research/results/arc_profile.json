@@ -1,0 +1,47 @@
+{
+ "note": "profile_sd_mm is the phase uncertainty a shared population profile leaves. Compare it against each contour's CURRENT error to see where the constraint is worth exploiting.",
+ "contours": {
+  "outer_helix": {
+   "n_landmarks": 25,
+   "gap_cv_per_ear": 0.1419,
+   "profile_sd_normalised": 0.0153,
+   "contour_length_mm": 113.43,
+   "profile_sd_mm": 1.7353,
+   "max_deviation_from_uniform": 0.0503,
+   "phase_determined": false
+  },
+  "concha": {
+   "n_landmarks": 30,
+   "gap_cv_per_ear": 0.2175,
+   "profile_sd_normalised": 0.0162,
+   "contour_length_mm": 82.37,
+   "profile_sd_mm": 1.3317,
+   "max_deviation_from_uniform": 0.0668,
+   "phase_determined": false
+  },
+  "inner_helix": {
+   "n_landmarks": 20,
+   "gap_cv_per_ear": 0.0184,
+   "profile_sd_normalised": 0.0063,
+   "contour_length_mm": 50.45,
+   "profile_sd_mm": 0.3201,
+   "max_deviation_from_uniform": 0.0007,
+   "phase_determined": true
+  },
+  "sup._antihelix": {
+   "n_landmarks": 10,
+   "gap_cv_per_ear": 0.012,
+   "profile_sd_normalised": 0.0073,
+   "contour_length_mm": 16.84,
+   "profile_sd_mm": 0.1234,
+   "max_deviation_from_uniform": 0.0014,
+   "phase_determined": true
+  }
+ },
+ "phase_determined_contours": [
+  "inner_helix",
+  "sup._antihelix"
+ ],
+ "n_landmarks_determined": 30,
+ "conclusion": "For inner_helix, sup._antihelix (30 of 85 landmarks) the shared profile pins phase to under 0.5mm, so knowing the curve determines the landmarks. Those contours currently carry 1.4859mm and 1.2051mm of error, so the constraint is unexploited. For outer_helix and concha the same profile leaves 1.4-1.7mm because their contours are 4-6x longer, and forcing a uniform profile on them is catastrophic (-146% and -224% in the endpoint oracle). Note the distinction that sank the earlier attempts: the exploitable structure is ARC-LENGTH POSITION, not smoothness. fam_phase.py imposed a reduced-rank smooth curve and scored 1.81mm."
+}
