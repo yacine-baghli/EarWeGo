@@ -201,6 +201,7 @@ REGISTRY = {
     "diffusionnet": ("fam_diffusionnet", None),
     "template":    ("fam_template", None),
     "bilateral":   ("fam_bilateral", None),         # MODE=single|bilateral|bilateral_head
+    "phase":       ("fam_phase", None),             # explicit curve + monotone phase
 }
 
 TRAIN_DEFAULTS = dict(lr=1.5e-3, bs=16, wd=5e-4, sub_frac=0.625,
