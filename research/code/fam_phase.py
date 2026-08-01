@@ -47,6 +47,7 @@ GK = int(os.environ.get("GK", "20"))
 NCTRL = int(os.environ.get("NCTRL", "16"))
 W_CURVE = float(os.environ.get("W_CURVE", "0.3"))
 MINSTEP = float(os.environ.get("MINSTEP", "0.25"))
+ENV_USE_NRM = bool(int(os.environ.get("USE_NRM", "0")))
 SCALE = 30.0
 
 
@@ -93,8 +94,12 @@ class MODEL(nn.Module):
 
     The 85 landmarks are produced ONLY by evaluating a curve at learned monotone phases.
     There is no free per-landmark XYZ output anywhere in the graph.
+
+    NEEDS is a CLASS attribute the trainer reads before any instance exists, so normals
+    must be requested through the ENVIRONMENT (USE_NRM=1). Assigning self.NEEDS in
+    __init__ is too late and would silently train on XYZ only -- rejected below.
     """
-    NEEDS = ()
+    NEEDS = ("nrm",) if ENV_USE_NRM else ()
 
     def __init__(self, cfg=None, meta=None):
         super().__init__()
@@ -104,9 +109,10 @@ class MODEL(nn.Module):
         self.nctrl = int(cfg.get("nctrl", NCTRL))
         self.w_curve = float(cfg.get("w_curve", W_CURVE))
         self.minstep = float(cfg.get("minstep", MINSTEP))
-        self.use_nrm = bool(cfg.get("use_nrm", False))
-        if self.use_nrm:
-            self.NEEDS = ("nrm",)
+        self.use_nrm = bool(cfg.get("use_nrm", ENV_USE_NRM))
+        assert not (self.use_nrm and "nrm" not in self.NEEDS), \
+            "use_nrm is on but NEEDS is empty: set USE_NRM=1 in the ENVIRONMENT (not " \
+            "only CFG_USE_NRM), and point DATA at a file carrying 'nrm'"
         cin = 3 + (3 if self.use_nrm else 0)
         self.e1, self.e2, self.e3 = EdgeConv(cin, 64), EdgeConv(64, 128), EdgeConv(128, 128)
         self.fuse = nn.Sequential(nn.Linear(320, C), nn.ReLU())
@@ -129,8 +135,13 @@ class MODEL(nn.Module):
         f = self.fuse(torch.cat([a, b, c], -1))
         return f, self.glob(f.max(1).values)
 
-    def forward(self, pc, q0, fts=None):
-        nrm = fts.get("nrm") if isinstance(fts, dict) else None
+    def forward(self, batch):
+        """train_family.py's contract: forward(batch) -> {'pred', ...}.
+
+        batch = {'pc' (B,N,3), 'coarse' (B,85,3), 'ear' (B,), **NEEDS}
+        """
+        pc, q0 = batch["pc"], batch["coarse"]
+        nrm = batch.get("nrm")
         f, g = self.encode(pc, nrm)
         B = pc.shape[0]
         out, phases = [], []
@@ -157,7 +168,7 @@ class MODEL(nn.Module):
             t = t / t[:, -1:].clamp(min=1e-6)                        # (B,n) in [0,1], increasing
             out.append(catmull_rom(P, t))
             phases.append(t)
-        return torch.cat(out, 1), {"phases": phases}
+        return {"pred": torch.cat(out, 1), "phases": phases}
 
     def loss(self, out, tg, batch=None):
         """Ordered MSE (the competition metric) plus a PHASE-INVARIANT curve term.
@@ -166,7 +177,7 @@ class MODEL(nn.Module):
         sampled densely, so it improves curve GEOMETRY without caring where the phases
         landed. Without it the two heads fight: a bad phase drags the control points.
         """
-        pred, aux = out if isinstance(out, tuple) else (out, {})
+        pred = out["pred"] if isinstance(out, dict) else out
         L = ((pred - tg) ** 2).sum(-1).mean()
         if self.w_curve > 0:
             for ci, (lo, hi) in enumerate(CONTOURS):
@@ -184,20 +195,21 @@ def _smoke():
     q0 = torch.randn(B, NL, 3) * 4
     tg = q0 + torch.randn(B, NL, 3) * 0.5
     m = MODEL({"width": 32, "gk": 8, "nctrl": 12})
-    pred, aux = m(pc, q0)
+    out = m({"pc": pc, "coarse": q0, "ear": torch.zeros(B, dtype=torch.long)})
+    pred = out["pred"]
     assert pred.shape == (B, NL, 3), pred.shape
     # the property this family exists for: phases are strictly increasing, by construction
-    for ci, t in enumerate(aux["phases"]):
+    for ci, t in enumerate(out["phases"]):
         d = t[:, 1:] - t[:, :-1]
         assert (d > 0).all(), f"contour {ci}: phase not strictly increasing (min {d.min():.2e})"
         assert torch.allclose(t[:, 0], torch.zeros(B)) and torch.allclose(t[:, -1], torch.ones(B))
-    L = m.loss((pred, aux), tg)
+    L = m.loss(out, tg)
     L.backward()
     gn = sum(float(p.grad.norm()) for p in m.parameters() if p.grad is not None)
     print(f"pred {tuple(pred.shape)}  params {sum(p.numel() for p in m.parameters()):,}  "
           f"loss {float(L):.4f}  grad-norm {gn:.3f}")
     print(f"phases strictly increasing in all {len(CONTOURS)} contours, endpoints exactly 0 and 1")
-    mn = min(float((t[:, 1:] - t[:, :-1]).min()) for t in aux["phases"])
+    mn = min(float((t[:, 1:] - t[:, :-1]).min()) for t in out["phases"])
     print(f"smallest phase step {mn:.5f} (floor {MINSTEP}/(n-1))")
     # a curve evaluated at monotone phases cannot reorder landmarks along itself
     print("OK")
