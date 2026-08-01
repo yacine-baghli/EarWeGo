@@ -1,0 +1,94 @@
+{
+ "fold": 0,
+ "models": [
+  "dgcnn",
+  "kpconv",
+  "ptv3",
+  "pointnext"
+ ],
+ "n_val_ears": 68,
+ "directions": {
+  "tangent": {
+   "per_model_rmse": {
+    "dgcnn": 1.3679,
+    "kpconv": 1.4909,
+    "ptv3": 1.4843,
+    "pointnext": 1.6188
+   },
+   "signed_error_correlation": {
+    "dgcnn|kpconv": 0.849,
+    "dgcnn|ptv3": 0.87,
+    "dgcnn|pointnext": 0.763,
+    "kpconv|ptv3": 0.818,
+    "kpconv|pointnext": 0.789,
+    "ptv3|pointnext": 0.737
+   },
+   "mean_offdiag_correlation": 0.804,
+   "equal_weight_rmse": 1.3742,
+   "best_single_rmse": 1.3679,
+   "insample_optimal_rmse_LEAKY": 1.3493,
+   "insample_optimal_weights_LEAKY": {
+    "dgcnn": 0.647,
+    "kpconv": 0.133,
+    "ptv3": 0.117,
+    "pointnext": 0.103
+   },
+   "headroom_vs_best_single_pct": -1.35
+  },
+  "across": {
+   "per_model_rmse": {
+    "dgcnn": 0.6748,
+    "kpconv": 0.6815,
+    "ptv3": 0.7142,
+    "pointnext": 0.748
+   },
+   "signed_error_correlation": {
+    "dgcnn|kpconv": 0.872,
+    "dgcnn|ptv3": 0.854,
+    "dgcnn|pointnext": 0.827,
+    "kpconv|ptv3": 0.807,
+    "kpconv|pointnext": 0.781,
+    "ptv3|pointnext": 0.792
+   },
+   "mean_offdiag_correlation": 0.822,
+   "equal_weight_rmse": 0.6549,
+   "best_single_rmse": 0.6748,
+   "insample_optimal_rmse_LEAKY": 0.6501,
+   "insample_optimal_weights_LEAKY": {
+    "dgcnn": 0.34,
+    "kpconv": 0.382,
+    "ptv3": 0.182,
+    "pointnext": 0.096
+   },
+   "headroom_vs_best_single_pct": -3.66
+  },
+  "normal": {
+   "per_model_rmse": {
+    "dgcnn": 0.2458,
+    "kpconv": 0.2391,
+    "ptv3": 0.2409,
+    "pointnext": 0.2307
+   },
+   "signed_error_correlation": {
+    "dgcnn|kpconv": 0.789,
+    "dgcnn|ptv3": 0.794,
+    "dgcnn|pointnext": 0.766,
+    "kpconv|ptv3": 0.774,
+    "kpconv|pointnext": 0.793,
+    "ptv3|pointnext": 0.774
+   },
+   "mean_offdiag_correlation": 0.782,
+   "equal_weight_rmse": 0.2189,
+   "best_single_rmse": 0.2307,
+   "insample_optimal_rmse_LEAKY": 0.2178,
+   "insample_optimal_weights_LEAKY": {
+    "dgcnn": 0.138,
+    "kpconv": 0.233,
+    "ptv3": 0.225,
+    "pointnext": 0.404
+   },
+   "headroom_vs_best_single_pct": -5.59
+  }
+ },
+ "conclusion": "Four unrelated architectures agree on the SIGN of their phase error at mean r=0.804. Even in-sample optimal weights -- an upper bound on any weighting scheme, and leaky by construction -- reduce along-contour RMSE by only 1.35% versus the best single model. Model choice and ensembling do not address the dominant error component. IMPORTANT LIMIT: all four share the same targets, the same ordered-MSE loss, the same canonicalisation and the same coarse initialisation, so this separates 'architecture-bound' from 'not architecture-bound' but NOT 'data-bound' from 'training-recipe-bound'. An objective that models phase explicitly is untried."
+}
