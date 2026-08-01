@@ -1,0 +1,40 @@
+{
+ "members": [
+  "dgcnn3",
+  "kpconv",
+  "ptv3"
+ ],
+ "n_ears": 340,
+ "stages_mm": {
+  "dgcnn3": 1.2292,
+  "kpconv": 1.2881,
+  "ptv3": 1.2982,
+  "ensemble_equal_weight": 1.1952,
+  "plus_surface_projection": 1.1897
+ },
+ "note": "equal weights, no fitting, so no selection optimism; dense-SSM blend omitted because it measured +0.0019mm once normals were corrected",
+ "final_vs_dgcnn3": {
+  "delta_mm": -0.0395,
+  "ci95": [
+   -0.053,
+   -0.0258
+  ],
+  "p_negative": 1.0
+ },
+ "final_vs_ensemble": {
+  "delta_mm": -0.0055,
+  "ci95": [
+   -0.0064,
+   -0.0048
+  ],
+  "p_negative": 1.0
+ },
+ "per_contour_mm": {
+  "outer_helix": 1.2649,
+  "concha": 0.9291,
+  "inner_helix": 1.4805,
+  "sup._antihelix": 1.2016
+ },
+ "median_mm": 0.9398,
+ "p90_mm": 2.3555
+}
