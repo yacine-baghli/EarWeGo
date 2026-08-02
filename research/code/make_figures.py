@@ -233,22 +233,32 @@ fig.subplots_adjust(wspace=0.32)
 ax = axes[0]
 grp = ["across contour", "along contour"]
 match = [pl["nn1_1d_across"]["mean"], pl["nn1_1d_along"]["mean"]]
-chance = pl["chance_1d"]["mean"]
+# chance is DIRECTION-SPECIFIC. A single pooled chance level would be wrong here: the
+# along-contour chance is 1.503mm and the across-contour one 1.384mm, so drawing one line
+# understates the along-contour bar's chance and makes it look worse than chance when it
+# is exactly at chance.
+chance = [pl["chance_1d_across"]["mean"], pl["chance_1d_along"]["mean"]]
 xg = np.arange(2)
 ax.bar(xg, match, width=0.5, color=["#1d4ed8", "#93a3b8"], edgecolor="white", lw=2)
-ax.hlines(chance, -0.45, 1.45, color=NEG, lw=1.6, ls=(0, (4, 3)))
-ax.annotate(f"chance {chance:.2f} mm", (-0.45, chance), xytext=(0, 5),
-            textcoords="offset points", ha="left", fontsize=8.5, color=NEG)
-for xi, m in zip(xg, match):
-    ax.annotate(f"{m:.2f} mm", (xi, m), xytext=(0, 4), textcoords="offset points",
-                ha="center", fontsize=9, fontweight="bold", color=INK)
+for xi, ch in zip(xg, chance):
+    ax.hlines(ch, xi - 0.33, xi + 0.33, color=NEG, lw=1.8, ls=(0, (4, 3)), zorder=4)
+ax.annotate(f"chance {chance[0]:.2f}", (0, chance[0]), xytext=(0, 6),
+            textcoords="offset points", ha="center", fontsize=8.5, color=NEG)
+# the along bar's top IS its chance line, so the label goes inside the bar
+ax.annotate(f"chance {chance[1]:.2f}", (1, chance[1]), xytext=(0, -14),
+            textcoords="offset points", ha="center", fontsize=8.5,
+            color="white", fontweight="bold")
+for xi, m, ch in zip(xg, match, chance):
+    ax.annotate(f"{m:.2f} mm\n{m/ch:.2f}x chance", (xi, m), xytext=(0, 22 if xi else 4),
+                textcoords="offset points", ha="center", fontsize=8.5,
+                fontweight="bold", color=INK)
 ax.set_xticks(xg, grp, fontsize=9)
 ax.tick_params(axis="x", labelcolor=INK)
 ax.set_ylim(0, 1.85)
 ax.set_ylabel("1-D localisation error (mm)")
 bare(ax)
 title(ax, "The surface knows across, not along",
-      "Training-free descriptor match, leave-one-subject-out.")
+      "Training-free match, leave-one-subject-out. Chance is direction-specific.")
 
 ax = axes[1]
 lab = ["sampling floor", "our prediction", "best training-free\ndescriptor match", "chance"]

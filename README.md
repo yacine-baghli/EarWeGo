@@ -161,9 +161,12 @@ nothing fitted and therefore nothing that can overfit. 120 ears, 10 200 landmark
   landmark to 1.891 mm against a chance level of 2.084 mm. Our model, on the same ears,
   is at 1.174 mm — it is *already* extracting more than the local surface alone contains.
 * **Along the contour, the surface says nothing.** Restricted to one direction, the
-  matcher reaches 1.010 mm across the contour (chance 1.384) but **1.509 mm along it —
-  worse than chance**. This is an independent, training-free confirmation of the
-  sharpness result above.
+  matcher reaches 1.010 mm across the contour against a chance level of 1.384 (**0.73 ×
+  chance** — real signal), and 1.509 mm along it against a chance level of 1.503
+  (**1.00 × chance** — none at all). Chance differs by direction, so the two must be
+  compared against their own baselines. Only 9 of 85 landmarks beat chance by 1.6 × along
+  the contour, against 48 across it. This is an independent, training-free confirmation of
+  the sharpness result above.
 * **8 of 85 landmarks are geometrically determined** (all in the inner helix, indices
   67–74); **30 of 85** are not determined at all.
 * **Where the surface is ambiguous, our model is wrong.** The matcher's own confusion
@@ -260,6 +263,8 @@ the search. All measured under the protocol above.
 | Slide inherited from the coarse initialiser | OOF R² −0.09 | null |
 | Slides *solved* from cross-contour rigidity | 1.178 → 1.453 mm | harmful |
 | Per-mode variance recalibration | +0.0002 mm | already calibrated |
+| 12-channel multi-scale curvature input (probe) | +0.31 mm vs normals alone | rejected before GPU |
+| Family B — native-mesh vertex heatmap output | 1.655 mm, overfits from epoch 20 | rejected |
 
 Two of those deserve their footnote:
 

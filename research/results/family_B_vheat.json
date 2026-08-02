@@ -1,0 +1,46 @@
+{
+ "family": "vheat",
+ "hypothesis": "The mesh is two orders of magnitude more accurate than any prediction (~1.0mm vertex spacing, GT 0.021mm off-surface) and no model had ever used it as the OUTPUT space. If the heatmap representation is what unlocks sub-1mm, a per-vertex heatmap + soft-argmax + bounded tangent offset onto a real incident triangle should show it -- without DiffusionNet's spectral machinery as a confound.",
+ "verdict": "REJECTED",
+ "run": {
+  "fold": 0,
+  "seed": 0,
+  "epochs": 400,
+  "eval_every": 20,
+  "params": 994936,
+  "runtime_s": 12010.0,
+  "device": "RTX A6000",
+  "best_val_MLE_mm": 1.6549,
+  "best_val_epoch": 20,
+  "per_contour_MLE_mm": {
+   "outer_helix": 2.0919,
+   "concha": 1.0967,
+   "inner_helix": 2.0392,
+   "sup._antihelix": 1.468
+  }
+ },
+ "curve": [
+  {"epoch": 20, "train": 1.4268, "val": 1.6549},
+  {"epoch": 40, "train": 1.1577, "val": 1.67},
+  {"epoch": 60, "train": 0.9238, "val": 1.7098},
+  {"epoch": 80, "train": 0.7351, "val": 1.6666},
+  {"epoch": 120, "train": 0.4942, "val": 1.7079},
+  {"epoch": 400, "train": 0.2252, "val": 1.7135}
+ ],
+ "comparison_same_fold": {
+  "dgcnn_normalsfix_s0_f0": 1.28,
+  "kpconv_s0_f0": 1.2964,
+  "ptv3_s0_f0": 1.3291,
+  "pointnext_s0_f0": 1.4022,
+  "bilateral_single_s0_f0": 1.3527,
+  "vheat_s0_f0": 1.6549
+ },
+ "diagnosis": "Pure memorisation. Training error falls 6x (1.4268 -> 0.2252) while validation is flat at ~1.70 from the first evaluation onward. 994,936 parameters against 272 training ears, with a per-vertex output over ~22k vertices per ear, is far past what this dataset supports.",
+ "conclusion": "Putting the output back on the scanned surface does NOT unlock sub-1mm. The best validation score is 1.6549mm against 1.28mm for the DGCNN baseline on the same fold, and it occurs at the FIRST evaluation. The mesh's superior resolution cannot be exploited by a per-vertex heatmap at this dataset size, which is consistent with info_limit.json: the surface carries no along-contour information to resolve, so a finer output space buys precision in the direction that is already accurate (0.21mm normal RMSE) and nothing in the direction that dominates.",
+ "caveats": [
+  "One fold, one seed. This is a characterisation run, not a 5-fold verdict -- but the failure mode (val flat while train collapses 6x) does not need five folds to read.",
+  "The evaluation grid starts at epoch 20, so the true optimum may lie earlier and slightly lower than 1.6549mm. It cannot plausibly reach 1.28mm from there.",
+  "A much smaller or much more heavily regularised variant is untested. The hypothesis rejected here is the OUTPUT SPACE at a capacity comparable to the other families, not the idea in every possible form.",
+  "fam_diffusionnet.py (the spectral sibling) remains untrained. Given this result its prior is poor, and it costs a 965MB artefact."
+ ]
+}
