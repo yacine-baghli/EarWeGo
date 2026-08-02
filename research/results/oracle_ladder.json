@@ -1,0 +1,82 @@
+{
+ "baseline_mm": 1.1776224386782874,
+ "n_ears": 340,
+ "note": "every row is fitted ON GT and is an oracle. Seven independent attempts to PREDICT any of these corrections have returned OOF R^2 <= 0: a 121-feature head/context probe, ridge and GBM on the full 255-coordinate predicted shape, and six post-hoc correction predictors.",
+ "ladder": [
+  {
+   "correction": "none (current best)",
+   "mle_mm": 1.1776,
+   "delta_mm": 0.0,
+   "dof_per_ear": 0
+  },
+  {
+   "correction": "global rigid",
+   "mle_mm": 1.0589,
+   "delta_mm": -0.1187,
+   "dof_per_ear": 6
+  },
+  {
+   "correction": "global similarity",
+   "mle_mm": 1.0513,
+   "delta_mm": -0.1263,
+   "dof_per_ear": 7
+  },
+  {
+   "correction": "per-contour tangent slide",
+   "mle_mm": 0.9216,
+   "delta_mm": -0.256,
+   "dof_per_ear": 4
+  },
+  {
+   "correction": "global similarity + per-contour slide",
+   "mle_mm": 0.8913,
+   "delta_mm": -0.2863,
+   "dof_per_ear": 11
+  },
+  {
+   "correction": "per-contour similarity",
+   "mle_mm": 0.6026,
+   "delta_mm": -0.575,
+   "dof_per_ear": 28
+  }
+ ],
+ "slide_sd_mm": {
+  "outer_helix": 0.9298,
+  "concha": 0.5386,
+  "inner_helix": 1.4039,
+  "sup._antihelix": 1.0273
+ },
+ "slide_correlation": [
+  [
+   1.0,
+   -0.08,
+   0.491,
+   0.02
+  ],
+  [
+   -0.08,
+   1.0,
+   0.012,
+   -0.505
+  ],
+  [
+   0.491,
+   0.012,
+   1.0,
+   0.033
+  ],
+  [
+   0.02,
+   -0.505,
+   0.033,
+   1.0
+  ]
+ ],
+ "slide_left_right_corr": {
+  "outer_helix": 0.333,
+  "concha": 0.302,
+  "inner_helix": 0.422,
+  "sup._antihelix": 0.331
+ },
+ "conclusion": "Per-contour similarity recovers 0.575mm with 28 dof per ear, so the contour SHAPES are largely correct and their PLACEMENT is wrong. The tangent error autocorrelates at 0.95-0.99 at lag 1, i.e. each contour slides along itself as a unit rather than being pointwise noisy. Outer and inner helix slides correlate +0.49, concha and antihelix -0.51, and a subject's two ears +0.30..+0.42 -- structure, not noise. None of it has proved predictable from the ear geometry available at test time."
+}
