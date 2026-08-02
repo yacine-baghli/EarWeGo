@@ -1,0 +1,37 @@
+{
+ "pooled_oof_mm": 1.1776,
+ "n_ears": 340,
+ "median_mm": 0.9305,
+ "p90_mm": 2.3323,
+ "members": {
+  "dgcnn_normals_3seed": 1.2292,
+  "kpconv_2seed": 1.2516,
+  "ptv3_2seed": 1.2417
+ },
+ "stages_mm": {
+  "ensemble_equal_weight": 1.1827,
+  "plus_surface_projection": 1.1776
+ },
+ "per_contour_mm": {
+  "outer_helix": 1.2493,
+  "concha": 0.9241,
+  "inner_helix": 1.4641,
+  "sup._antihelix": 1.1861
+ },
+ "vs_previous_best_1.1897": {
+  "delta_mm": -0.0121,
+  "ci95": [
+   -0.0178,
+   -0.0064
+  ],
+  "p_negative": 1.0
+ },
+ "profile_probe_fold0": {
+  "base": 1.2809,
+  "fixed": 1.3305,
+  "learned": 1.2718,
+  "all4_negative_control": 1.3453,
+  "note": "all4 worst as designed, confirming the placement acts as claimed; fixed worse than base; learned -0.0091 is one fold, one seed, +88k params -- inside noise, not counted"
+ },
+ "note": "equal weights (no fitting, no selection optimism); dense-SSM blend omitted (+0.0019 once normals corrected)"
+}
