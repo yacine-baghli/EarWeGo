@@ -124,6 +124,8 @@ ENV_DEFAULTS = dict(
     npass=int(os.environ.get("NPASS", "4")),         # offset/snap refinement passes
     dropout=float(os.environ.get("DROPOUT", "0.1")),
     use_nrm=int(os.environ.get("USE_NRM", "0")),     # append per-point normals to the input
+    use_crv=int(os.environ.get("USE_CRV", "0")),     # append per-point curvature channels
+    n_crv=int(os.environ.get("N_CRV", "12")),        # width of the curvature block (crv_names)
     fdim=int(os.environ.get("FDIM", "256")),         # width handed to the head (base: 256)
     nkp=int(os.environ.get("NKP", "15")),            # kernel points (1 centre + nkp-1 on a shell)
     kp_rho=float(os.environ.get("KP_RHO", "0.66")),  # shell radius as a fraction of r
@@ -145,8 +147,8 @@ ENV_DEFAULTS = dict(
 def derive(cfg):
     """Normalise a config (env defaults + CFG_* overrides) and add the mm schedule."""
     c = dict(ENV_DEFAULTS, **(cfg or {}))
-    for k in ("npts", "width", "stages", "npass", "use_nrm", "fdim", "nkp", "kmax",
-              "bottle", "in_pos", "head_k", "untied", "nb_chunk", "nb_stats"):
+    for k in ("npts", "width", "stages", "npass", "use_nrm", "use_crv", "n_crv", "fdim",
+              "nkp", "kmax", "bottle", "in_pos", "head_k", "untied", "nb_chunk", "nb_stats"):
         c[k] = int(c[k])
     for k in ("r0", "v0", "dropout", "kp_rho", "kp_sigma"):
         c[k] = float(c[k])
@@ -469,7 +471,7 @@ class Net(nn.Module):
     def __init__(self, cin=None, cfg=None):
         super().__init__()
         c = self.c = derive(cfg)
-        cin = 3 + 3 * c["use_nrm"] if cin is None else cin
+        cin = 3 + 3 * c["use_nrm"] + c["n_crv"] * c["use_crv"] if cin is None else cin
         self.enc = Encoder(c, cin)
         F, HO = c["fdim"], c["head_offs"]
         self.heads = nn.ModuleList([Head(c, F, None if HO is None else HO[min(i, len(HO) - 1)])
@@ -508,7 +510,11 @@ class Net(nn.Module):
 class FamKPConv(nn.Module):
     """train_family.py adapter. `NEEDS` is a CLASS attribute the trainer reads before any
     instance exists, so normals must be requested through the ENVIRONMENT (USE_NRM=1);
-    CFG_USE_NRM alone cannot make the trainer load 'nrm' and is rejected in __init__."""
+    CFG_USE_NRM alone cannot make the trainer load 'nrm' and is rejected in __init__.
+    USE_CRV=1 does the same for the differential-geometry channels built by
+    research/code/build_curv_data.py: it needs DATA=scratch/screen_data_8192crv.npz and
+    N_CRV set to that file's channel count (12 = {S,C,H,K} x {1.5,3,6}mm). Curvature is
+    SCALAR, so it is deliberately NOT in ROTATES -- rotating it would be a shape error."""
 
     DEFAULTS = ENV_DEFAULTS
     SEARCH_SPACE = dict(r0=[2.0, 2.5, 3.0, 3.5], stages=[2, 3, 4], width=[32, 48, 64],
@@ -516,7 +522,8 @@ class FamKPConv(nn.Module):
                         kp_sigma=[0.40, 0.55, 0.70], bottle=[2, 4], npass=[3, 4, 5],
                         dropout=[0.0, 0.1, 0.2], untied=[0, 1], head_k=[32, 48, 64],
                         norm=["layer", "none"], lr=[7e-4, 1.5e-3, 3e-3])
-    NEEDS = ("nrm",) if ENV_DEFAULTS["use_nrm"] else ()
+    NEEDS = (("nrm",) if ENV_DEFAULTS["use_nrm"] else ()) + \
+            (("crv",) if ENV_DEFAULTS["use_crv"] else ())
     ROTATES = ("nrm",)
     SAMPLES = 1
 
@@ -527,12 +534,21 @@ class FamKPConv(nn.Module):
         assert not (c["use_nrm"] and "nrm" not in self.NEEDS), \
             "use_nrm is on but NEEDS is empty: set USE_NRM=1 in the ENVIRONMENT (not only " \
             "CFG_USE_NRM) so the trainer loads 'nrm', and point DATA at screen_data_2048nrm.npz"
+        assert not (c["use_crv"] and "crv" not in self.NEEDS), \
+            "use_crv is on but 'crv' is not in NEEDS: set USE_CRV=1 in the ENVIRONMENT " \
+            "(not only CFG_USE_CRV) and point DATA at scratch/screen_data_8192crv.npz"
         assert meta["nl"] == NL and meta["contours"] == CONTOURS, "head geometry contract broken"
         self.sup = np.array([0.5 ** (c["npass"] - 1 - t) for t in range(c["npass"])])
         self.sup /= self.sup.sum()
 
     def forward(self, b):
-        outs, fin = self.net(b["pc"], b["coarse"], b.get("nrm") if self.net.c["use_nrm"] else None)
+        c = self.net.c
+        ft = [b["nrm"]] if c["use_nrm"] else []
+        if c["use_crv"]:
+            assert b["crv"].shape[-1] == c["n_crv"], \
+                f"crv has {b['crv'].shape[-1]} channels, N_CRV says {c['n_crv']}"
+            ft.append(b["crv"])
+        outs, fin = self.net(b["pc"], b["coarse"], torch.cat(ft, -1) if ft else None)
         return {"pred": fin, "aux": [q2 for _, q2 in outs], "pre": [q1 for q1, _ in outs]}
 
     def loss(self, out, tg):
@@ -605,6 +621,7 @@ if __name__ == "__main__":
     npar = sum(p.numel() for p in fam.parameters())
     print(f"fam_kpconv  NPTS={c['npts']} WIDTH={c['width']} STAGES={c['stages']} R0={c['r0']} "
           f"V0={c['v0']} NPASS={c['npass']} DROPOUT={c['dropout']} USE_NRM={c['use_nrm']} "
+          f"USE_CRV={c['use_crv']}(N_CRV={c['n_crv']}) NEEDS={FamKPConv.NEEDS} "
           f"NKP={c['nkp']} KMAX={c['kmax']}(auto={ENV_DEFAULTS['kmax'] <= 0})")
     print(f"params: {npar:,}   radii {c['rad']} mm   voxels {[None] + c['vox'][1:]} mm")
     kp = fam.net.enc.stem.kp.kp
@@ -614,7 +631,8 @@ if __name__ == "__main__":
           + f" mm, sigma(level 0) {fam.net.enc.stem.kp.sigma:.2f} mm\n")
 
     out = fam({"pc": pc, "coarse": q0, "ear": torch.arange(B),
-               "nrm": nrm if c["use_nrm"] else None})
+               "nrm": nrm if c["use_nrm"] else None,
+               "crv": (torch.rand(B, NPTS, c["n_crv"]) * 2 - 1) if c["use_crv"] else None})
     loss = fam.loss(out, tgt)
     loss.backward()
     gnorm = sum(float(p.grad.norm()) ** 2 for p in fam.parameters() if p.grad is not None) ** 0.5

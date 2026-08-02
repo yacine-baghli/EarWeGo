@@ -46,6 +46,24 @@ ENVIRONMENT (all optional except FAMILY; every value is echoed into the report)
   CFG_JSON    {}   whole family config as one JSON object
   CFG_<NAME>       one config entry, auto-typed (int/float/bool/JSON/str).
                    CFG_LR=3e-4 CFG_KNN=32 CFG_RADII='[11,9,7.4]'
+  ACCUM       1    micro-batches per optimiser step. The optimiser still sees batches of
+                   cfg['bs'] ears; the batch is built and AUGMENTED WHOLE and only the
+                   FORWARD is sliced into ACCUM pieces of ceil(bs/ACCUM). EXACT, not an
+                   approximation, on both counts:
+                     * gradient -- every family here is LayerNorm-only (no BatchNorm in
+                       fam_kpconv / fam_ptv3 / fam_dgcnn) so nothing couples the ears in a
+                       slice, and each slice's loss is reweighted by its true share of the
+                       batch, so the accumulated gradient equals the full-batch one to
+                       float error (res_sweep_prep.py smoke 4/4 checks it entry-wise, and
+                       checks that dropping the reweight breaks it);
+                     * randomness -- augmenting whole and slicing after means the sample
+                       choice, rotation, scale, jitter and subsample draws are byte-for-
+                       byte what ACCUM=1 would have drawn, so an ACCUM>1 arm is not
+                       silently a different seed.
+                   Dropout still draws its masks per slice; it is per-sample either way.
+                   Exists for the resolution sweep: 32768-point clouds do not fit 16 ears
+                   of KPConv on 48 GB, and shrinking `bs` instead would change the
+                   optimisation and confound the very comparison the sweep is making.
   FULL_EVAL   1    run the full-pipeline evaluation if its artefacts are present
   TRIS        $WORK/mesh_data.npz         packed per-ear triangles (contract below)
   SSM         $WORK/dense_ssm_f<FOLD>.npz per-FOLD dense SSM (contract below)
@@ -198,12 +216,14 @@ REGISTRY = {
     "kpconv":      ("fam_kpconv", None),            # None -> the module's `MODEL`
     "pointnext":   ("fam_pointnext", None),
     "ptv3":        ("fam_ptv3", None),
-    "diffusionnet": ("fam_diffusionnet", None),
+    "diffusionnet": ("fam_diffusionnet", None),    # intrinsic mesh, HEAD=heatmap|coordfield
+    "vheat":       ("fam_vheat", None),            # native-mesh vertex heatmap, no spectrum
     "template":    ("fam_template", None),
     "bilateral":   ("fam_bilateral", None),         # MODE=single|bilateral|bilateral_head
     "phase":       ("fam_phase", None),             # explicit curve + monotone phase
     "profile":     ("fam_profile", None),           # arc-length placement, PROFILE_CONTOURS
     "endpoint":    ("fam_endpoint", None),          # contour-endpoint specialist (ARTEFACTS)
+    "local":       ("fam_local", None),             # per-landmark cascade refiner (LOCAL_CROPS)
 }
 
 TRAIN_DEFAULTS = dict(lr=1.5e-3, bs=16, wd=5e-4, sub_frac=0.625,
@@ -614,6 +634,8 @@ def main():
     sch = torch.optim.lr_scheduler.CosineAnnealingLR(opt, EPOCHS)
     EVERY = int(os.environ.get("EVAL_EVERY", str(max(1, EPOCHS // 12))))
     BS = int(cfg["bs"])
+    ACCUM = max(1, int(os.environ.get("ACCUM", "1")))
+    MICRO = -(-BS // ACCUM)
     TRUE = data["true"].cpu().numpy().astype(np.float64)
     tr_probe = tr_idx[:40]
 
@@ -635,8 +657,20 @@ def main():
                 batch, tg = AUG(batch, tg, cfg, ROTATES, GEN)
             batch = _flatten_samples(batch, NSAMP)
             opt.zero_grad()
-            loss = default_loss(model(batch), tg, model, batch)
-            loss.backward(); opt.step()
+            # The batch is built and AUGMENTED WHOLE and only the forward is sliced, so
+            # every random draw -- sample choice, rotation, scale, jitter, subsample --
+            # is identical to ACCUM=1. Doing it the other way (augment each micro-batch)
+            # would consume the generators in a different order and turn a memory
+            # workaround into a silent change of the training run. The augmented batch
+            # costs ~4 MB at 32768x16; the activations it feeds cost ~19 GB.
+            for a in range(0, len(bi), MICRO):     # ACCUM=1 -> one slice, i.e. unchanged
+                sl = {k: (v[a:a + MICRO] if torch.is_tensor(v) and v.shape[:1] == (len(bi),)
+                          else v) for k, v in batch.items()}
+                # the losses are per-ear MEANS, so a slice must carry its share of the
+                # batch or a ragged tail would be over-weighted
+                w = len(sl["ear"]) / len(bi)
+                (default_loss(model(sl), tg[a:a + MICRO], model, sl) * w).backward()
+            opt.step()
         sch.step()
         if (ep + 1) % EVERY == 0 or ep + 1 == EPOCHS:
             Pv, _, var = evaluate(model, data, va_idx, NSAMP, 2, BATCH_FN, meta)
@@ -699,6 +733,7 @@ def main():
            "runtime_s": round(time.time() - t0, 1), "epochs": EPOCHS,
            "config": {**cfg, "_family": FAMILY, "_data": DATA, "_samples": NSAMP,
                       "_needs": list(NEEDS), "_eval_every": EVERY,
+                      "_accum": ACCUM, "_micro_bs": MICRO,
                       "_batch_hook": BATCH_FN is not None,
                       "_augment": None if AUG is None else AUG.__name__},
            "ordered_MLE_mm": round(raw["ordered"], 4),

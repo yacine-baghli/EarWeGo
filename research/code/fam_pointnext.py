@@ -145,6 +145,8 @@ STAGES = int(os.environ.get("STAGES", "4"))           # 4 | 6 | 8 set-abstractio
 NPASS = int(os.environ.get("NPASS", "6"))             # 4 | 6 | 8 refinement passes
 DROPOUT = float(os.environ.get("DROPOUT", "0.1"))
 USE_NRM = int(os.environ.get("USE_NRM", "0"))         # 1 -> concat per-point normals
+USE_CRV = int(os.environ.get("USE_CRV", "0"))         # 1 -> concat curvature channels
+N_CRV = int(os.environ.get("N_CRV", "12"))            # its width (build_curv_data crv_names)
 NSAMPLE = int(os.environ.get("NSAMPLE", "32"))        # ball-query neighbours per centroid
 NFINAL = int(os.environ.get("NFINAL", "64"))          # centroids at the bottleneck
 BLOCKS = int(os.environ.get("BLOCKS", "1"))           # InvResMLP blocks per stage
@@ -431,7 +433,7 @@ class PointNeXtLandmark(nn.Module):
     """
     def __init__(self, npts=NPTS, stages=STAGES, width=WIDTH, npass=NPASS,
                  nfinal=NFINAL, nsample=NSAMPLE, blocks=BLOCKS, exp=EXPANSION,
-                 cin=3 + (3 if USE_NRM else 0)):
+                 cin=3 + (3 if USE_NRM else 0) + (N_CRV if USE_CRV else 0)):
         super().__init__()
         self.N, self.S, self.R = level_plan(npts, stages, nfinal, nsample)
         self.RP, self.OP, self.LEV = pass_plan(npass, npts, stages, nfinal, nsample)
@@ -506,7 +508,8 @@ class MODEL(nn.Module):
     submodule is constructed. One model per process, which is how the driver runs.
     """
     DEFAULTS = dict(npts=NPTS, width=WIDTH, stages=STAGES, npass=NPASS, dropout=DROPOUT,
-                    use_nrm=USE_NRM, nsample=NSAMPLE, nfinal=NFINAL, blocks=BLOCKS,
+                    use_nrm=USE_NRM, use_crv=USE_CRV, n_crv=N_CRV,
+                    nsample=NSAMPLE, nfinal=NFINAL, blocks=BLOCKS,
                     expansion=EXPANSION, norm=NORM, khead=KHEAD, keepmin=KEEPMIN,
                     r_first=R_FIRST, r_last=R_LAST, o_first=O_FIRST, o_last=O_LAST,
                     sampler=SAMPLER, fps_chunk=FPS_CHUNK, qbytes=QBYTES,
@@ -517,7 +520,9 @@ class MODEL(nn.Module):
                         r_first=[9.0, 11.0, 13.0], r_last=[2.0, 2.5, 3.5],
                         nfinal=[32, 64, 128],
                         aug_jit=[round(f * AUG_JIT, 4) for f in (0.5, 1.0, 2.0)])
-    NEEDS = ("nrm",) if USE_NRM else ()      # class-level, so USE_NRM must come from the env
+    # class-level, so USE_NRM/USE_CRV must come from the env. Curvature is SCALAR and is
+    # deliberately absent from ROTATES -- default_augment would treat it as a direction.
+    NEEDS = (("nrm",) if USE_NRM else ()) + (("crv",) if USE_CRV else ())
     ROTATES = ("nrm",)
     SAMPLES = 1
 
@@ -526,6 +531,9 @@ class MODEL(nn.Module):
         assert int(cfg.get("use_nrm", USE_NRM)) == USE_NRM, (
             "set USE_NRM in the environment, not CFG_USE_NRM -- train_family.py reads "
             "cls.NEEDS before instantiating, so the normals channel is fixed by then")
+        assert int(cfg.get("use_crv", USE_CRV)) == USE_CRV, (
+            "set USE_CRV in the environment, not CFG_USE_CRV -- same reason; and point "
+            "DATA at scratch/screen_data_8192crv.npz with N_CRV = its channel count")
         assert int(cfg["npts"]) == meta["npts"], (
             f"cfg npts={cfg['npts']} but DATA has {meta['npts']} points per cloud; the "
             "radius ladder is in millimetres and depends on the density, so point the "
@@ -558,10 +566,12 @@ class MODEL(nn.Module):
                                      width=int(cfg["width"]), npass=int(cfg["npass"]),
                                      nfinal=int(cfg["nfinal"]), nsample=NSAMPLE,
                                      blocks=int(cfg["blocks"]), exp=int(cfg["expansion"]),
-                                     cin=3 + (3 if USE_NRM else 0))
+                                     cin=3 + (3 if USE_NRM else 0)
+                                         + (N_CRV if USE_CRV else 0))
 
     def forward(self, b):
-        outs, final, _ = self.net(b["pc"], b["coarse"], b.get("nrm"))
+        f = [b[k] for k in ("nrm", "crv") if b.get(k) is not None]
+        outs, final, _ = self.net(b["pc"], b["coarse"], torch.cat(f, -1) if f else None)
         return {"pred": final, "aux": [q for pair in outs for q in pair]}
 
     def loss(self, out, tg):
@@ -630,7 +640,10 @@ if __name__ == "__main__":
           flush=True)
 
     t0 = time.time()
-    outs, final, info = net(pc, q0, nrm if USE_NRM else None, diag=True)
+    crv = torch.rand(B, P, N_CRV, generator=gen) * 2 - 1
+    _ft = ([nrm] if USE_NRM else []) + ([crv] if USE_CRV else [])
+    ft_all = torch.cat(_ft, -1) if _ft else None
+    outs, final, info = net(pc, q0, ft_all, diag=True)
     tf = time.time() - t0
     loss = sum(((q1 - q0) ** 2).sum(-1).mean() + ((q2 - q0) ** 2).sum(-1).mean()
                for q1, q2 in outs) + ((final - q0) ** 2).sum(-1).mean()
@@ -681,7 +694,7 @@ if __name__ == "__main__":
     # train_family.py's augmentation subsamples to sub_frac*N -- the ladder must follow
     keep = torch.randperm(P, generator=gen)[:int(P * 0.625)]
     sub = pc[:, keep]
-    _, fsub, _ = net(sub, q0, nrm[:, keep] if USE_NRM else None)
+    _, fsub, _ = net(sub, q0, None if ft_all is None else ft_all[:, keep])
     assert fsub.shape == (B, NL, 3) and torch.isfinite(fsub).all()
     print(f"sub_frac=0.625 path ({sub.shape[1]} pts): {tuple(fsub.shape)}, "
           f"level-0 radius rescaled {net.R[0]:.2f} -> {net.R[0]/math.sqrt(0.625):.2f}mm")
@@ -690,7 +703,8 @@ if __name__ == "__main__":
     m = MODEL({**MODEL.DEFAULTS}, dict(nl=NL, contours=CONTOURS, scale=SCALE, npts=P,
                                        fold=0, dev="cpu", n_train_ears=272, artefacts={}))
     b = {"pc": pc, "coarse": q0, "ear": torch.zeros(B, dtype=torch.long)}
-    o = m({**b, **({"nrm": nrm} if MODEL.NEEDS else {})})
+    o = m({**b, **({"nrm": nrm} if "nrm" in MODEL.NEEDS else {}),
+           **({"crv": crv} if "crv" in MODEL.NEEDS else {})})
     ls = m.loss(o, q0)
     ls.backward()
     assert o["pred"].shape == (B, NL, 3) and len(o["aux"]) == 2 * NPASS

@@ -85,6 +85,14 @@ if SHARD == "merge":                     # stitch the shards into the final file
         assert z["clouds"].shape[1] == M, f"shard {k} has M={z['clouds'].shape[1]}, not {M}"
         idx = z["idx"]
         cl[idx] = z["clouds"]; nr[idx] = z["nrm"]; seen[idx] = True
+        # DELSHARD=1 drops each shard the moment it is in RAM, so the peak DISK need is
+        # max(all shards, the output) rather than their sum. At 32768/M=4 that is 0.49GB
+        # instead of 0.97GB, which is the difference between fitting and not on a machine
+        # with ~1.2GB free. It also means a failed merge costs the whole rebuild, so it is
+        # off by default.
+        if os.environ.get("DELSHARD") == "1":
+            del z
+            os.remove(p)
     assert seen.all(), f"{(~seen).sum()} ears missing after merge"
     out = f"scratch/screen_data_{NPTS}nrm.npz"
     np.savez_compressed(out, clouds=cl, nrm=nr, coarse=coarse[:NE], true=true[:NE],

@@ -108,6 +108,8 @@ DEFAULTS = dict(
     untied=int(os.environ.get("UNTIED", "0")),       # 1 = per-pass head weights
     dropout=float(os.environ.get("DROPOUT", "0.1")),
     use_nrm=int(os.environ.get("USE_NRM", "0")),     # 1 = concat oriented normals
+    use_crv=int(os.environ.get("USE_CRV", "0")),     # 1 = concat curvature (build_curv_data)
+    n_crv=int(os.environ.get("N_CRV", "12")),        # its channel count, len(crv_names)
     heads=int(os.environ.get("HEADS", "4")),         # must divide every stage width
     mlp=int(os.environ.get("MLP", "2")),             # feed-forward expansion ratio
     voxel=float(os.environ.get("VOXEL", "0.85")),    # stage-0 voxel edge, mm
@@ -440,7 +442,8 @@ class Net(nn.Module):
         super().__init__()
         c = cfg if isinstance(cfg, Cfg) and "widths" in cfg else config(cfg)
         self.c = c
-        self.enc = PTv3(3 + 3 * bool(c.use_nrm) if cin is None else cin, c)
+        self.enc = PTv3(3 + 3 * bool(c.use_nrm) + c.n_crv * bool(c.use_crv)
+                        if cin is None else cin, c)
         self.heads = nn.ModuleList([Head(c.headc, c) for _ in range(c.npass if c.untied else 1)])
         self.lmfeat = nn.Sequential(nn.Linear(c.headc, 64), nn.ReLU())
         self.contour_nets = nn.ModuleList([
@@ -481,11 +484,19 @@ class Net(nn.Module):
         return outs, torch.stack(finals, 0).mean(0), finals
 
 
-def _nrm_wanted():
+def _env_flag(name):
     """NEEDS is a class attribute the trainer reads BEFORE any cfg exists, so it has to
-    peek at CFG_USE_NRM the same way train_family.py would resolve it."""
-    v = str(os.environ.get("CFG_USE_NRM", os.environ.get("USE_NRM", "0"))).strip('"')
+    peek at CFG_<NAME> the same way train_family.py would resolve it."""
+    v = str(os.environ.get(f"CFG_{name}", os.environ.get(name, "0"))).strip('"')
     return v.lower() not in ("0", "false", "")
+
+
+def _nrm_wanted():
+    return _env_flag("USE_NRM")
+
+
+def _crv_wanted():
+    return _env_flag("USE_CRV")
 
 
 class PTv3Family(nn.Module):
@@ -506,7 +517,8 @@ class PTv3Family(nn.Module):
                         voxel=[0.7, 0.85, 1.0], voxgrow=[2.0, 2.5, 3.0], npass=[2, 4],
                         dropout=[0.0, 0.1, 0.2], mlp=[2, 4], heads=[4, 8],
                         lr=[3e-4, 1e-3, 1.5e-3])
-    NEEDS = ("nrm",) if _nrm_wanted() else ()
+    # curvature is SCALAR: it belongs in NEEDS but must never appear in ROTATES
+    NEEDS = (("nrm",) if _nrm_wanted() else ()) + (("crv",) if _crv_wanted() else ())
     ROTATES = ("nrm",)
     SAMPLES = 1
 
@@ -518,6 +530,9 @@ class PTv3Family(nn.Module):
         assert bool(c.use_nrm) == ("nrm" in self.NEEDS), \
             ("use_nrm and NEEDS disagree: NEEDS is fixed at import from CFG_USE_NRM/"
              "USE_NRM, so set it in the environment, not only in a cfg dict")
+        assert bool(c.use_crv) == ("crv" in self.NEEDS), \
+            ("use_crv and NEEDS disagree: set USE_CRV/CFG_USE_CRV in the ENVIRONMENT and "
+             "point DATA at scratch/screen_data_8192crv.npz (N_CRV = its channel count)")
         # VOXEL/POOLR are a millimetre ladder against a given DENSITY (see the table in
         # the module docstring): at 2048 points VOXEL=0.85/POOLR=4 leaves stage 1 with
         # 1214 occupied voxels for 512 slots, so the uniform merge -- not the grid --
@@ -529,7 +544,8 @@ class PTv3Family(nn.Module):
         self.net = Net(cfg=c)
 
     def forward(self, batch):
-        ft = [batch["nrm"]] if "nrm" in batch else None
+        f = [batch[k] for k in ("nrm", "crv") if batch.get(k) is not None]
+        ft = [torch.cat(f, -1)] if f else None
         outs, fin, _ = self.net([batch["pc"]], batch["coarse"], ft)
         return {"pred": fin, "aux": [q for pair in outs for q in pair]}
 
@@ -555,7 +571,7 @@ if __name__ == "__main__":
     torch.manual_seed(0); np.random.seed(0)
     # resolve use_nrm the way NEEDS and train_family.py's CFG_* merge do, so that both
     # USE_NRM=1 and CFG_USE_NRM=1 run this file consistently
-    C = config({"use_nrm": int(_nrm_wanted())})
+    C = config({"use_nrm": int(_nrm_wanted()), "use_crv": int(_crv_wanted())})
 
     # 1. is the Hilbert encoding actually a Hilbert curve?
     for bits in (3, 4):
@@ -582,7 +598,9 @@ if __name__ == "__main__":
     t = torch.rand(B, N); th = torch.rand(B, N) * 6.283
     pc = torch.stack([27 * th.cos() * (1 + 0.1 * (3 * t).sin()),
                       19.5 * th.sin(), 45 * t - 22.5], -1) + torch.randn(B, N, 3) * 0.15
-    ft = Fn.normalize(pc, dim=-1) if C.use_nrm else None
+    ftp = ([Fn.normalize(pc, dim=-1)] if C.use_nrm else []) + \
+          ([torch.rand(B, N, C.n_crv) * 2 - 1] if C.use_crv else [])
+    ft = torch.cat(ftp, -1) if ftp else None
     q0 = pc[:, torch.linspace(0, N - 1, NL).long()] + torch.randn(B, NL, 3) * 0.8
     net = Net(cfg=C)
     npar = sum(p.numel() for p in net.parameters())
@@ -648,12 +666,15 @@ if __name__ == "__main__":
     #    produces one, and evaluation then uses the full cloud, so both must run
     meta = dict(nl=NL, contours=CONTOURS, scale=SCALE, npts=N, fold=0, dev="cpu",
                 n_train_ears=272, artefacts={})
-    fam = MODEL({**MODEL.DEFAULTS, "width": 32, "stages": 2, "use_nrm": C.use_nrm}, meta)
+    fam = MODEL({**MODEL.DEFAULTS, "width": 32, "stages": 2, "use_nrm": C.use_nrm,
+                 "use_crv": C.use_crv}, meta)
     import train_family as TF                     # guarded __main__, so importing is safe
     for nsub in (N, int(N * 0.625) - 7):
         batch = {"pc": pc[:, :nsub], "coarse": q0, "ear": torch.arange(B)}
-        if MODEL.NEEDS:
-            batch["nrm"] = ft[:, :nsub]
+        if "nrm" in MODEL.NEEDS:
+            batch["nrm"] = ft[:, :nsub, :3]
+        if "crv" in MODEL.NEEDS:
+            batch["crv"] = ft[:, :nsub, -C.n_crv:]
         out = fam(batch)
         # the harness's dispatcher must reach THIS family's loss, not default_loss's own
         # geometric weights over the interleaved pairs
