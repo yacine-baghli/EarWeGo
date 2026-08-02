@@ -1,0 +1,69 @@
+{
+ "baseline_mm": 1.1776,
+ "n_ears": 340,
+ "coarse_mm": 3.7658,
+ "feature": "mean_i <coarse_i - pred_i, predicted_tangent_i>  (no ground truth)",
+ "target": "mean_i <pred_i - gt_i, t_i>  (the oracle ladder's per-contour slide)",
+ "per_contour": {
+  "outer_helix": {
+   "sd_target_slide_mm": 0.9298,
+   "corr_feature_target": 0.0272,
+   "oof_r2_univariate": -0.0249,
+   "oof_r2_multivariate": -0.0992
+  },
+  "concha": {
+   "sd_target_slide_mm": 0.5386,
+   "corr_feature_target": -0.0242,
+   "oof_r2_univariate": -0.0142,
+   "oof_r2_multivariate": -0.1119
+  },
+  "inner_helix": {
+   "sd_target_slide_mm": 1.4039,
+   "corr_feature_target": -0.0759,
+   "oof_r2_univariate": 0.0006,
+   "oof_r2_multivariate": -0.0499
+  },
+  "sup._antihelix": {
+   "sd_target_slide_mm": 1.0273,
+   "corr_feature_target": -0.0535,
+   "oof_r2_univariate": -0.022,
+   "oof_r2_multivariate": -0.0981
+  }
+ },
+ "corrections": {
+  "univariate": {
+   "mle_mm": 1.1809,
+   "delta_mm": 0.0032,
+   "ci95": [
+    0.0003,
+    0.0062
+   ],
+   "verdict": "HARMFUL"
+  },
+  "multivariate": {
+   "mle_mm": 1.1996,
+   "delta_mm": 0.0219,
+   "ci95": [
+    0.0145,
+    0.0296
+   ],
+   "verdict": "HARMFUL"
+  },
+  "oracle_slide_LEAKY": {
+   "mle_mm": 0.9202,
+   "delta_mm": -0.2575,
+   "ci95": [
+    -0.2788,
+    -0.2369
+   ],
+   "verdict": "ADOPT"
+  }
+ },
+ "mean_oof_r2_multivariate": -0.0898,
+ "conclusion": "Mean out-of-fold R^2 of the best test-time-available predictor is -0.0898. The refined placement is NOT inherited from the coarse initialiser in any way a submission could exploit, so the r=0.80 agreement between four backbones is about the task, not about their shared input. The initialiser-disagreement feature joins the seven predictors that carry no usable signal -- this is the eighth.",
+ "caveats": [
+  "The TARGET uses the GT frame's tangent, which is correct because the target is a diagnostic quantity; the FEATURE and the applied CORRECTION use only the predicted polyline's own tangent, so the correction is deployable as written.",
+  "Linear maps only. A nonlinear map of the same features is not tried here.",
+  "oracle_slide_LEAKY is fitted on ground truth and is a bound, not a result."
+ ]
+}

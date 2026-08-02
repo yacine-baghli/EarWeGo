@@ -1,0 +1,167 @@
+{
+ "baseline_mm": 1.1776,
+ "n_ears": 340,
+ "n_cross_pairs": 2600,
+ "idea": "solve the four per-contour slides from the population separations of cross-contour landmark pairs, instead of regressing them from features",
+ "rigidity": {
+  "cv_gt_min": 0.0279,
+  "cv_gt_p10": 0.0437,
+  "cv_gt_median": 0.0761,
+  "cv_pred_median": 0.0616,
+  "median_cv_ratio_top200": 0.893,
+  "most_rigid_pairs": [
+   {
+    "i": 8,
+    "j": 45,
+    "contours": [
+     "outer_helix",
+     "concha"
+    ],
+    "cv_gt": 0.0279,
+    "cv_pred": 0.0252
+   },
+   {
+    "i": 7,
+    "j": 45,
+    "contours": [
+     "outer_helix",
+     "concha"
+    ],
+    "cv_gt": 0.028,
+    "cv_pred": 0.026
+   },
+   {
+    "i": 23,
+    "j": 66,
+    "contours": [
+     "outer_helix",
+     "inner_helix"
+    ],
+    "cv_gt": 0.029,
+    "cv_pred": 0.0277
+   },
+   {
+    "i": 23,
+    "j": 65,
+    "contours": [
+     "outer_helix",
+     "inner_helix"
+    ],
+    "cv_gt": 0.0291,
+    "cv_pred": 0.0282
+   },
+   {
+    "i": 7,
+    "j": 44,
+    "contours": [
+     "outer_helix",
+     "concha"
+    ],
+    "cv_gt": 0.0291,
+    "cv_pred": 0.0254
+   },
+   {
+    "i": 6,
+    "j": 45,
+    "contours": [
+     "outer_helix",
+     "concha"
+    ],
+    "cv_gt": 0.0292,
+    "cv_pred": 0.0268
+   },
+   {
+    "i": 6,
+    "j": 44,
+    "contours": [
+     "outer_helix",
+     "concha"
+    ],
+    "cv_gt": 0.0295,
+    "cv_pred": 0.026
+   },
+   {
+    "i": 8,
+    "j": 44,
+    "contours": [
+     "outer_helix",
+     "concha"
+    ],
+    "cv_gt": 0.0296,
+    "cv_pred": 0.025
+   }
+  ]
+ },
+ "solves": {
+  "top100_damp1": {
+   "mle_mm": 1.6169,
+   "delta_mm": 0.4392,
+   "ci95": [
+    0.3794,
+    0.5027
+   ],
+   "corr_with_true_slide": 0.0038,
+   "verdict": "HARMFUL"
+  },
+  "top100_damp10": {
+   "mle_mm": 1.6166,
+   "delta_mm": 0.439,
+   "ci95": [
+    0.3792,
+    0.5023
+   ],
+   "corr_with_true_slide": 0.0039,
+   "verdict": "HARMFUL"
+  },
+  "top400_damp1": {
+   "mle_mm": 1.5142,
+   "delta_mm": 0.3365,
+   "ci95": [
+    0.2904,
+    0.385
+   ],
+   "corr_with_true_slide": 0.0457,
+   "verdict": "HARMFUL"
+  },
+  "top400_damp10": {
+   "mle_mm": 1.5141,
+   "delta_mm": 0.3365,
+   "ci95": [
+    0.2904,
+    0.385
+   ],
+   "corr_with_true_slide": 0.0457,
+   "verdict": "HARMFUL"
+  },
+  "top1200_damp1": {
+   "mle_mm": 1.4534,
+   "delta_mm": 0.2758,
+   "ci95": [
+    0.235,
+    0.3191
+   ],
+   "corr_with_true_slide": 0.0825,
+   "verdict": "HARMFUL"
+  },
+  "top1200_damp10": {
+   "mle_mm": 1.4534,
+   "delta_mm": 0.2758,
+   "ci95": [
+    0.235,
+    0.3191
+   ],
+   "corr_with_true_slide": 0.0825,
+   "verdict": "HARMFUL"
+  }
+ },
+ "best_config": "top1200_damp1",
+ "oracle_slide_LEAKY_mm": 0.9202,
+ "verdict": "HARMFUL",
+ "headline": "THE PREDICTION IS UNDER-DISPERSED. Over the 200 most rigid cross-contour pairs the predicted separations vary LESS across ears than the ground-truth ones do: median CV ratio 0.893 < 1. If the prediction were truth plus noise the ratio would exceed 1, so this is shrinkage, not error. Our model emits the population-typical configuration; real ears deviate from it, and that deviation is precisely the 28 degrees of freedom the oracle ladder recovers.",
+ "conclusion": "Best configuration top1200_damp1 reaches 1.4534 mm (+0.2758 vs baseline, CI [0.235, 0.3191]), recovering the true slide at r = 0.0825. Cross-contour separations cannot pin the contours down, and the reason is the headline above rather than a weak solver: there is no excess slack to detect, because the prediction already satisfies the population geometry MORE tightly than real ears do. The constraint is not violated, so inverting it only injects noise (recovery r = 0.0825). This is the ninth failed attempt at the slide and the first to fail by IDENTIFIABILITY rather than by regression -- and the shrinkage it exposes is what an MSE-trained model SHOULD do when part of the target is unpredictable: emit the conditional mean. The remaining error is then conditional variance, which no architecture, resolution or ensemble can remove. Only new information, or a target that is not the arc-length parameterisation, can.",
+ "caveats": [
+  "mu, sigma, the pair selection and the size normalisation all come from the outer fold's TRAINING ears; the solve sees only the held-out ear's own prediction.",
+  "The linearisation is first-order in the slide, iterated three times; slides are clipped to +-3mm per step so an ill-conditioned ear cannot blow up.",
+  "S_TRUE and the GT frame are used ONLY to score and to report the recovery correlation, never inside the solve."
+ ]
+}
