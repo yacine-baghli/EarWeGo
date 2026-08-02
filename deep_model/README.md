@@ -1,20 +1,32 @@
-# Deep Contour-Ensemble Landmark Model
+# Deep Contour-Ensemble Landmark Model — the exported model
 
-Best validated model in this repository: **1.273 mm** mean landmark error on the
-held-out validation split (60 ears / 30 subjects) — a **32 % improvement over the
-classical Dense-V4 pipeline** (1.85 mm val) and a **2× improvement over the
-previously committed model** on the one-shot test set (2.65 mm).
+> **Scope.** This file documents the **torch-free model that is actually exported here**:
+> the 4-seed DGCNN with TTA and surface projection. Under the frozen protocol
+> ([root README](../README.md#evaluation-protocol)) it scores **1.3144 mm** pooled
+> out-of-fold over all 340 development ears; the **1.273 mm** quoted below is its score
+> on the earlier fixed 60-ear validation split, kept for continuity.
+>
+> The current best result in the repository is **1.1776 mm**, from a cross-family
+> ensemble (DGCNN + KPConv + PTv3) that has not yet been exported to this NumPy
+> inference path. For the current error analysis — including the oracle ladder that
+> supersedes the "≈ 1.06 mm" hypothesis stated in earlier versions of this file — see the
+> [root README](../README.md#where-the-error-actually-is) and
+> [`research/results/`](../research/results/).
+
+Validated at **1.273 mm** mean landmark error on the held-out validation split
+(60 ears / 30 subjects) — a **32 % improvement over the classical Dense-V4 pipeline**
+(1.85 mm val) and a **2× improvement over the previously committed model** on the
+one-shot test set (2.65 mm).
 
 > **Target (from the organizers):** < 0.5 mm is "good", < 0.2 mm "very good", because
 > these landmarks feed pinna measurements used for HRTFs
 > ([Dinakaran et al., ICASSP 2018](https://depositonce.tu-berlin.de/items/f9757195-f1a2-493a-809e-a4a4a7de7f49):
 > ~1 mm surface precision preserves localization cues). The ground-truth *positions* are
-> precise (0.006 mm from the surface), but their *parametrisation along each contour*
-> carries a per-annotation-session component that no surface model can recover — measured
-> in [where the remaining error lives](#where-the-remaining-error-lives-and-what-we-could-not-predict).
-> Under the (stated, falsifiable) assumption that this component is unpredictable, a
-> geometry-perfect method would still score ≈ **1.06 mm** on this metric. That is a
-> **hypothesis, not a bound** — see the section below for its assumptions.
+> precise (0.006 mm from the surface); what is wrong in our predictions is their
+> *placement along each contour*. An oracle that fixes only per-contour placement —
+> 28 numbers per ear, fitted on ground truth — reaches **0.6026 mm**, so nothing measured
+> so far rules the 0.5 mm target out. Nothing measured so far predicts those 28 numbers
+> from the ear either.
 
 ![results](results/deep_results.png)
 
@@ -156,14 +168,21 @@ spacing is **algorithmically equidistant** (gap CV 0.011–0.018 on two contours
 intrinsic point jitter is only ~0.15 mm. **The remaining error is model error.**
 
 The dominant component is **tangential** — sliding *along* the contour (1.06 mm vs
-0.61 mm perpendicular). Measured cause: the landmarks have **no local geometric
-signature** to detect. Surface curvature along the contour is flat (~5°/mm) at *every*
-scale down to the 0.5 mm mesh resolution, and the nearest curvature feature sits
-1.2–1.4 mm away (no better than random). **The GT was built by tracing contours,
-projecting to the surface, and resampling by arc length** — so 30 of the 85 landmarks
-are pure arc-length samples with no detectable local identity. A per-point detector
-fundamentally cannot place them; that is the wrong framing, and it is why the levers
-below all fail.
+0.61 mm perpendicular for this model; **80 % of the error energy** for the current best
+ensemble). Measured cause: the landmarks have **no local geometric signature** to detect.
+Surface curvature along the contour is flat (~5°/mm) at *every* scale down to the 0.5 mm
+mesh resolution, and the nearest curvature feature sits 1.2–1.4 mm away (no better than
+random). **The GT was built by tracing contours, projecting to the surface, and resampling
+by arc length** — so 30 of the 85 landmarks are pure arc-length samples with no detectable
+local identity. A per-point detector fundamentally cannot place them; that is the wrong
+framing, and it is why the levers below all fail.
+
+Two later measurements sharpen this and are the ones to trust
+([root README](../README.md#where-the-error-actually-is)): local sharpness *hurts* the
+along-contour component (+0.15) while helping the across-contour one (−0.14), because a
+ridge pins you across it and says nothing along it; and each contour slides as a **unit**
+(along-contour error autocorrelates 0.95–0.99 at lag 1), so the missing information is
+per-contour placement, not per-point detection.
 
 Levers that were *measured* (not guessed) and do **not** work:
 
