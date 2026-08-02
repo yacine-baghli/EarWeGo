@@ -64,9 +64,10 @@ reports as flat. build_mesh_data.decimate() already documents the same hazard fo
 clustering.
 
 So the neighbourhood is  (k-ring of the mesh graph)  INTERSECT  (Euclidean ball of
-radius r), with k = ceil(RMAX / median_edge) + KRING_PAD, capped at KRING_MAX. Being
-inside the k-ring makes a neighbour reachable along the surface in <= k hops, so a point
-on the far side of a fold is admitted only if it is ALSO within k hops around the rim.
+radius r), with k = ceil(r / median_edge) + KRING_PAD PER RADIUS, capped at KRING_MAX
+(the three patterns are built incrementally, so the extra ones are free). Being inside
+the k-ring makes a neighbour reachable along the surface in <= k hops, so a point on the
+far side of a fold is admitted only if it is ALSO within k hops around the rim.
 This is a hop-bounded geodesic ball, not an exact one -- an exact multi-source geodesic
 ball (scipy dijkstra with limit) costs ~20-40s/ear, i.e. 3+ hours for 340 ears, for a
 distinction that only bites where the rim is thinner than r AND shorter than k hops
@@ -214,12 +215,31 @@ estimator's own error and acts as feature noise rather than a bias. S is scale-I
 and is therefore exactly consistent under the jitter -- another reason to trust it most.
 
 
+COST, MEASURED (one core, a 41.4k-target-vertex crop, the largest of the 340):
+  hop patterns k=[5,8,14]  18.0s        fit r=1.5  3.5s      r=3.0  9-12s
+  fit r=6.0  ~29s          angle deficit 0.8s      replay x4  0.3s
+i.e. ~60s for the worst ear, ~17s for the smallest (20.4k), and the r=6 fit alone is
+half of it -- the pattern holds 34M (vertex, neighbour) pairs and 22M survive the ball.
+340 ears is ~2.5-3 CPU-hours; SHARD=k over 3 processes brings it to ~1h wall.
+The accumulation was benchmarked three ways (see principal_curvatures); bincount won.
+
+WHAT IS NOT VERIFIED HERE
+  * the hop-bounded ball is not an exact geodesic ball; the residual bridging rate across
+    a thin rim is not measured. The k*median_edge REACH per ear is reported, and a
+    WARNING is printed if KRING_MAX truncates it below RMAX on any ear.
+  * the estimator is validated against closed-form sphere/cylinder/saddle and against
+    angle-deficit K on real ears (median r ~0.54-0.64 at r=1.5mm, which is what a noisy
+    0.5mm-edge scan gives, not the 0.9997 the smooth phantom gives). There is no
+    ground-truth curvature on a real ear, so absolute accuracy is UNKNOWN.
+  * nothing here has been trained. The probe (research/code/curv_probe.py) measures
+    whether the channel is DISCRIMINATIVE, not whether a network can use it.
+
 ENV (defaults in brackets)
   NPTS [8192] M [4]        must match screen_data_<NPTS>nrm.npz
   RADII [1.5,3.0,6.0]      fitting radii in mm, comma separated
   KCLIP [2.0]              |k| <= KCLIP / r
   REG [1e-6]               Tikhonov on the normalised 5x5 normal matrix
-  KRING_PAD [2] KRING_MAX [16]   hop budget = ceil(RMAX/median_edge) + PAD, capped
+  KRING_PAD [2] KRING_MAX [16]   hop budget = ceil(r/median_edge) + PAD per radius, capped
   BLOCK [400000]           target (vertex,neighbour) pairs per vectorised block
   CHK [3]                  right ears re-run unmirrored for the invariance assert
   CHK_TOL [2e-5] LR_TOL [0.10] REPLAY_TOL [1e-4]
@@ -296,16 +316,35 @@ def tangent_frames(N):
 
 def hop_pattern(F, n, rows, k):
     """rows x n boolean CSR: vertices reachable from `rows` in <= k mesh-graph hops."""
+    return hop_patterns(F, n, rows, [k])[0]
+
+
+def hop_patterns(F, n, rows, ks):
+    """one pattern per hop budget in the ASCENDING list `ks`, built INCREMENTALLY.
+
+    Q(k2) = Q(k1) @ A^(k2-k1), so the total sparse-matmul work is that of the LARGEST
+    budget alone -- the smaller patterns come out of the same walk for free. This matters:
+    at RMAX=6mm the k=14 pattern holds ~825 neighbours per row while the r=1.5mm ball
+    needs ~40, and the fit iterates over the PATTERN, not the ball. Sharing one k=14
+    pattern across all three radii (the first version) spent 20x the work it had to at
+    the small scales -- measured 8.6s vs 2.6s for r=1.5 on a 41k-vertex crop.
+    """
     E = np.vstack([F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]])
     r = np.concatenate([E[:, 0], E[:, 1], np.arange(n)])      # self-loops -> "<= k"
     c = np.concatenate([E[:, 1], E[:, 0], np.arange(n)])
     A = sp.coo_matrix((np.ones(len(r), bool), (r, c)), shape=(n, n)).tocsr()
     A.data[:] = True
     Q = A[rows]
-    for _ in range(k - 1):
-        Q = Q @ A
-        Q.data[:] = True
-    return Q
+    out, done = [], 1
+    for k in ks:
+        assert k >= done, "hop budgets must be ascending"
+        for _ in range(k - done):
+            Q = Q @ A
+            Q.data[:] = True
+        Q.sort_indices()
+        out.append(Q.copy())
+        done = k
+    return out
 
 
 def angle_deficit(V, F, n):
@@ -347,7 +386,7 @@ def principal_curvatures(V, N, X, Y, rows, Q, r, reg=REG, block=BLOCK):
     for a, b in zip(cut[:-1], cut[1:]):
         lo, hi = Q.indptr[a], Q.indptr[b]
         col = Q.indices[lo:hi].astype(np.int64)
-        rl = np.repeat(np.arange(b - a), nb[a:b])    # row index LOCAL to the block
+        rl = np.repeat(np.arange(b - a), nb[a:b])    # row index LOCAL to the block, SORTED
         gr = rows[a:b][rl]
         e = V[col] - V[gr]
         d2 = np.einsum("ij,ij->i", e, e)
@@ -356,10 +395,15 @@ def principal_curvatures(V, N, X, Y, rows, Q, r, reg=REG, block=BLOCK):
         nrow = b - a
         cnt[a:b] = np.bincount(rl, minlength=nrow)
         w = np.exp(-s2 * d2)
-        u = np.einsum("ij,ij->i", e, X[gr[keep]]) / r
-        v = np.einsum("ij,ij->i", e, Y[gr[keep]]) / r
-        t = np.einsum("ij,ij->i", e, N[gr[keep]]) / r
+        gk = gr[keep]
+        u = np.einsum("ij,ij->i", e, X[gk]) / r
+        v = np.einsum("ij,ij->i", e, Y[gk]) / r
+        t = np.einsum("ij,ij->i", e, N[gk]) / r
         D = np.stack([u, v, 0.5 * u * u, u * v, 0.5 * v * v])            # (5, P)
+        # 21 weighted moments by bincount. MEASURED alternatives, both rejected: filling a
+        # (P,21) matrix and np.add.reduceat-ing it is 2.4x SLOWER (21 stride-168B column
+        # writes per block), and the contiguous (21,P) cumsum variant wins only 20% while
+        # losing 3 orders of accumulation accuracy over 400k terms.
         G = np.zeros((nrow, 5, 5)); rhs = np.zeros((nrow, 5))
         for p in range(5):
             rhs[:, p] = np.bincount(rl, w * D[p] * t, minlength=nrow)
@@ -397,22 +441,23 @@ def channels(k1, k2, r, kclip=KCLIP):
 
 
 def curvature_on_mesh(V, N, F, n, rows):
-    """(len(rows), NCH) channel block + diagnostics, all radii, one hop pattern."""
+    """(len(rows), NCH) channel block + diagnostics; one hop pattern PER RADIUS."""
     X, Y = tangent_frames(N)
     el = np.linalg.norm(V[F[:, [1, 2, 0]]] - V[F], axis=2).ravel()
     med = float(np.median(el))
-    khop = int(min(KRING_MAX, np.ceil(RMAX / max(med, 1e-6)) + KRING_PAD))
-    Q = hop_pattern(F, n, rows, khop)
+    khops = [int(min(KRING_MAX, np.ceil(r / max(med, 1e-6)) + KRING_PAD)) for r in RADII]
+    Qs = hop_patterns(F, n, rows, khops)
     out = np.zeros((len(rows), NCH), np.float64)
-    diag = dict(khop=khop, med_edge=med, nclip=[], nlow=[], k1=[], k2=[], nbr=[])
+    diag = dict(khop=khops[-1], khops=khops, med_edge=med, nclip=[], nlow=[], k1=[],
+                k2=[], nbr=[])
     for ri, r in enumerate(RADII):
-        k1, k2, cnt = principal_curvatures(V, N, X, Y, rows, Q, r)
+        k1, k2, cnt = principal_curvatures(V, N, X, Y, rows, Qs[ri], r)
         out[:, 4 * ri:4 * ri + 4], nc = channels(k1, k2, r)
         diag["nclip"].append(nc); diag["nlow"].append(int((cnt < 6).sum()))
         diag["nbr"].append(float(cnt.mean()))
         diag["k1"].append(np.percentile(k1, [0.1, 1, 50, 99, 99.9]))
         diag["k2"].append(np.percentile(k2, [0.1, 1, 50, 99, 99.9]))
-    return out, diag, Q
+    return out, diag
 
 
 # ------------------------------------------------------------------ per-ear build
@@ -458,7 +503,7 @@ def build_ear(V, F, VN, R, cc, coarse_i, i):
     tgt = loc[np.unique(Fs)]
     assert (tgt >= 0).all(), "14mm crop vertex missing from the enlarged crop"
 
-    feat, diag, _ = curvature_on_mesh(V2, N2, F2l, len(sel), tgt)
+    feat, diag = curvature_on_mesh(V2, N2, F2l, len(sel), tgt)
     full = np.zeros((len(sel), NCH))
     full[tgt] = feat
 
@@ -517,12 +562,20 @@ def run():
     ds = Dataset(MESH, LM); pid2idx = {p: i for i, p in enumerate(ds.subject_ids)}
 
     IDX = np.arange(NE) if SHARD == "" else np.arange(int(SHARD), NE, NSHARD)
+    if SHARD != "":
+        # Drop the other shards' clouds. Only the replay assert and the normal-dot
+        # diagnostic read them, and 340 ears of (M,NPTS,3) f32 is 268MB per PROCESS --
+        # which is what decides how many shards fit in RAM alongside the 34M-nnz hop
+        # pattern. ROW maps an ear index to its row in whatever is still resident.
+        clouds0, nrm0 = clouds0[IDX], nrm0[IDX]
+    ROW = {int(i): k for k, i in enumerate(IDX)} if SHARD != "" else \
+          {int(i): int(i) for i in IDX}
     print(f"[curv] {len(IDX)} of {NE} ears  radii {RADII}mm  KCLIP={KCLIP} "
           f"channels={NCH}  src={SRC}", flush=True)
 
     crv = np.zeros((len(IDX), M, NPTS, NCH), np.float16)
     D = {k: [] for k in ("khop", "med_edge", "k_corr", "n_tgt", "n_sup", "replay",
-                         "nrmdot", "meanS", "side")}
+                         "nrmdot", "meanS", "side", "reach")}
     nclip = np.zeros(NR, np.int64); nlow = np.zeros(NR, np.int64); nbr = np.zeros(NR)
     k1p = np.zeros((NR, 5)); k2p = np.zeros((NR, 5)); npts_tot = 0
     chk_done = 0; chk_err = []
@@ -545,7 +598,7 @@ def run():
 
         R, cc = Rm[i].astype(np.float64), c0[i].astype(np.float64)
         c, cl, nr, feat, dg = build_ear(V, F, VN, R, cc, coarse[i].astype(np.float64), i)
-        rep = float(np.abs(cl - clouds0[i]).max())
+        rep = float(np.abs(cl - clouds0[ROW[int(i)]]).max())
         assert rep < REPLAY_TOL, (
             f"ear {i} ({pid}/{side}): replayed cloud differs from {SRC} by {rep:.3e} mm. "
             f"The curvature would be attached to the WRONG points -- refusing.")
@@ -564,9 +617,10 @@ def run():
             chk_err.append(float(np.abs(fu - feat).max())); chk_done += 1
 
         D["khop"].append(dg["khop"]); D["med_edge"].append(dg["med_edge"])
+        D["reach"].append(dg["khop"] * dg["med_edge"])
         D["k_corr"].append(dg["k_corr"]); D["n_tgt"].append(dg["n_tgt"])
         D["n_sup"].append(dg["n_sup"]); D["replay"].append(rep)
-        D["nrmdot"].append(float((nr * nrm0[i]).sum(-1).mean()))
+        D["nrmdot"].append(float((nr * nrm0[ROW[int(i)]]).sum(-1).mean()))
         D["meanS"].append(float(c[..., 0::4].mean())); D["side"].append(side)
         nclip += np.array(dg["nclip"]); nlow += np.array(dg["nlow"])
         nbr += np.array(dg["nbr"]); npts_tot += dg["n_tgt"]
@@ -583,6 +637,15 @@ def run():
           f"{P['n_tgt'].max()}  enlarged {P['n_sup'].min()}/{int(np.median(P['n_sup']))}/"
           f"{P['n_sup'].max()}  median edge {P['med_edge'].min():.3f}.."
           f"{P['med_edge'].max():.3f}mm  hops {P['khop'].min()}..{P['khop'].max()}")
+    # The hop budget is capped at KRING_MAX. If the cap binds on a fine mesh the k-ring
+    # stops short of RMAX and the largest ball is TRUNCATED -- the estimate then quietly
+    # becomes a smaller-scale one. Reported, because it is invisible in every other number.
+    cap = int((P["khop"] >= KRING_MAX).sum())
+    print(f"--- hop budget: capped at KRING_MAX={KRING_MAX} on {cap}/{n} ears; "
+          f"k*median_edge reach {P['reach'].min():.2f}..{P['reach'].max():.2f}mm "
+          f"vs RMAX {RMAX}mm" + ("" if P["reach"].min() >= RMAX else
+          f"  <-- WARNING: {int((P['reach'] < RMAX).sum())} ears reach under RMAX, their "
+          f"r={RMAX:g}mm ball is truncated; raise KRING_MAX"))
     print("--- RAW principal curvature (1/mm) before clipping, pooled percentiles")
     for ri, r in enumerate(RADII):
         print(f"    r={r:g}mm  mean |nbrs| {nbr[ri]/n:6.1f}   "
