@@ -1,0 +1,33 @@
+{
+ "question": "is the along-contour (tangent) error limited by local resolution or local geometry?",
+ "answer": "NO -- and local sharpness makes it WORSE",
+ "per_landmark_correlations_n85": {
+  "error_vs_local_vertex_density": -0.052,
+  "error_vs_surface_sharpness": 0.12,
+  "tangent_rmse_vs_sharpness": 0.146,
+  "across_rmse_vs_sharpness": -0.141,
+  "normal_rmse_vs_sharpness": 0.455
+ },
+ "flat_vs_sharp_sites_rmse_mm": {
+  "flattest10": {
+   "tangent": 1.247,
+   "across": 0.708,
+   "normal": 0.1069
+  },
+  "sharpest10": {
+   "tangent": 1.5212,
+   "across": 0.6397,
+   "normal": 0.2417
+  },
+  "ratio_sharp_over_flat": {
+   "tangent": 1.22,
+   "across": 0.9,
+   "normal": 2.26
+  }
+ },
+ "local_mesh_spacing_mm": 0.81,
+ "mechanism": "A ridge constrains position ACROSS it and says nothing about position ALONG it. Landmarks at sharp sites sit on ridges, so their along-ridge coordinate is locally unconstrained by construction. Local sharpness therefore improves the across component (already the accurate one at 0.61) and degrades the tangent component (the dominant one at 1.25).",
+ "consequence": "Curvature features, per-landmark local crops and higher point density all attack local geometry, hence the across/normal components -- 23% of the error energy. They cannot address the tangent component. Expect small gains from all three.",
+ "implication": "The tangent information is NON-LOCAL. Position along a ridge is fixed by where the contour STARTS and ENDS, and a ridge terminus or junction IS locally well-defined in a way that a mid-ridge point never is. That is a topological property of the ear ridge network, not a local patch property.",
+ "supporting": "Per-ear errors are largely uncorrelated between contours (0.01-0.48), so there is no global failure mode. Best ear 0.544mm and best landmark 0.566mm show the pipeline reaches sub-0.6mm when the geometry allows."
+}
