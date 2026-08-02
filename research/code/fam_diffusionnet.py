@@ -12,22 +12,25 @@ predicted polyline recover 1.0345 (scalar shift) / 0.7848 (affine) / 0.5657
 generic local-XYZ refinement stage is measuring noise. Both heads below make phase a
 structural property of the model instead of something a loss has to discover:
 
-  HEAD=heatmap    85 per-vertex heatmaps -> masked softmax over vertices -> expected
-                  position (this is what carries the gradient), then a bounded tangent
-                  offset at the argmax vertex which is projected EXACTLY onto that
-                  vertex's incident-triangle fan. The output is a genuine barycentric
-                  point of a real triangle, so it lies ON the surface by construction
-                  (the GT lies 0.006 mm off the surface; raw predictions sit ~0.17 mm
-                  off it, and snapping alone was worth 1.329 -> 1.309 mm).
+  HEAD=heatmap    85 per-vertex heatmaps -> masked softmax over the TOP-K vertices ->
+                  expected position (this is what carries the gradient), then a bounded
+                  tangent offset which is projected EXACTLY onto an incident triangle.
+                  The output is a genuine barycentric point of a real triangle, so it
+                  lies ON the surface by construction (the annotated landmarks lie
+                  0.0212 mm from the emitted surface on average, p99 0.15 mm; raw
+                  predictions sit ~0.17 mm off it, and snapping alone was worth
+                  1.329 -> 1.309 mm).
   HEAD=coordfield a dense per-vertex CANONICAL TEMPLATE COORDINATE field u: V -> R^3.
                   Landmarks are FIXED points of the template's canonical space, so the
                   85 landmarks are transferred by inverting u: find the target vertex
                   whose predicted canonical coordinate is nearest the template landmark,
                   then solve for that landmark's clamped barycentric coordinates inside
                   the fan triangle MEASURED IN CANONICAL SPACE and apply those same
-                  weights to the vertices' TARGET-space positions. Phase is then decided
-                  by a dense field fitted over the whole surface, never by a local
-                  detector, and the output is again exactly on the surface.
+                  weights to the vertices' TARGET-space positions.
+                  *** NOT RUNNABLE TODAY: it needs `tmpl_lm` (85 landmarks in the fold's
+                  template canonical space) and ideally `canon_uv` (per-vertex NICP
+                  correspondence). Neither artefact exists. __init__ refuses rather than
+                  substituting something. See "WHAT IS STILL MISSING" below. ***
 
 The backbone is genuinely intrinsic: learned per-channel diffusion time applied
 spectrally, plus direction-aware spatial-gradient features (inner products of per-vertex
@@ -37,165 +40,135 @@ kernel signature; the default xyzhks adds the canonical-frame xyz/normal, which 
 legitimately available and informative -- but xyz is never the sole signal, and
 INFEAT=xyz exists only as the ablation that proves the intrinsic channels carry signal.
 
-LEAKAGE. Nothing here touches ground truth outside `loss()`. The only external artefact
-is `tmpl_lm` (HEAD=coordfield): the 85 landmarks in the template's canonical space. That
-is a FOLD-SCOPED artefact -- build_mesh_data.py must build it from the current fold's
-TRAINING ears only and pass the fold index through. `canon_uv` (optional dense
-correspondence supervision for the coordinate field) is likewise train-ears-only and is
-read only inside `loss()`.
+-------------------------------------------------------------------------------------
+INTEGRATION -- this file was written against a tensor contract that build_mesh_data.py
+never emitted, and was never trained. Everything below is now routed through
+research/code/mesh_batch.py, which is the ONE bridge from the ragged
+scratch/mesh_data.npz (+ scratch/mesh_spec.npz) to a padded batch, and which
+research/code/fam_vheat.py shares. The defects that were fixed to get here are listed at
+the bottom of this docstring so they are not reintroduced.
+-------------------------------------------------------------------------------------
 
-    HEAD=heatmap    WIDTH=128 BLOCKS=4 KEIG=128 python3 research/code/fam_diffusionnet.py
-    HEAD=coordfield python3 research/code/fam_diffusionnet.py      # CPU smoke test
+LEAKAGE. NEEDS is empty; cls.BATCH returns only geometry from mesh_batch.MeshStore, which
+never loads lm_vert/lm_face/lm_bary; ground truth is read only inside loss(). `tmpl_lm`
+(HEAD=coordfield) is a FOLD-SCOPED artefact handed in through train_family.py's ARTEFACTS
+mechanism, which asserts the fold and that no validation ear built it.
+
+THE DECODER'S CEILING IS NOT THE PROBLEM. HEAD=heatmap shares its decoder with
+fam_vheat.py, whose `decoder_ceiling` measures it on 40 real ears of
+scratch/mesh_data.npz: nearest vertex 0.3415 mm, + exact fan projection 0.0328 mm, and
+0.1446 mm for a heatmap that is EXACTLY the training target (k=32, sigma=1.0 mm). So
+this head can express any answer down to ~0.14 mm; if it fails it will be because the
+peak lands on the wrong vertex, which is a PHASE failure and exactly the thing
+HEAD=coordfield was designed for.
+
+WHAT IS STILL MISSING (do not paper over it)
+  * HEAD=coordfield needs ARTEFACTS=<npz with tmpl_lm (85,3), fold, train_ear_mask>.
+  * `canon_uv` / `canon_ok` (dense correspondence supervision) are not produced by any
+    script here, so w_field is inert even once tmpl_lm exists.
+  * scratch/mesh_data.npz is DECIMATED (MAXV=12000 -> 0.85/0.99/1.10 mm spacing) while
+    the native crops are 19.5k-52.9k vertices at ~0.67 mm. Rebuilding with MAXV=0 raises
+    the decoder ceiling (see fam_vheat.decoder_ceiling) at ~4 GB of artefact.
+
+ENV
+  MESH_DATA scratch/mesh_data.npz   ragged geometry
+  MESH_SPEC scratch/mesh_spec.npz   eigenpairs; read only because KEIG > 0
+  KEIG      128    eigenpairs LOADED. Read at MODULE level, not from cfg, because
+                   cls.BATCH is a class-level hook the trainer calls without an instance
+                   -- __init__ asserts cfg['keig'] matches so CFG_KEIG cannot silently
+                   diverge from what was loaded.
+  HEAD      heatmap | coordfield
+  STRICT    1      re-check the padding invariants every forward
+
+    FAMILY=diffusionnet FOLD=0 SEED=0 EPOCHS=600 CFG_BS=6 \
+        python3 research/code/train_family.py
+    python research/code/fam_diffusionnet.py        # CPU smoke test, real connectivity
+
+DEFECTS FIXED (each one blocked a real run; all were invisible to the old smoke test,
+which drove the model directly on hand-packed synthetic tensors and never went through
+train_family.py)
+  1. no module-level `MODEL`, so resolve_family('diffusionnet') asserted out.
+  2. `__init__(self, head=HEAD, width=WIDTH, ...)`; the trainer calls `cls(cfg, meta)`, so
+     cfg bound to `head` and the very first assert fired.
+  3. no DEFAULTS / NEEDS / ROTATES / SAMPLES / BATCH / AUGMENT. With no BATCH the batch
+     carries no mesh at all; with no AUGMENT the DEFAULT augmenter rotates pc, coarse and
+     the TARGET and leaves `verts` untouched -- every shape check passes and the model
+     trains against an inconsistent frame.
+  4. forward returned {'lm': ...}; train_family.evaluate reads out['pred'].
+  5. loss returned a TUPLE (total, terms); the trainer calls .backward() on it.
+  6. the tensor contract did not exist. `tanb`, `grad_nbr`, `grad_wx`, `grad_wy`, `vfan`,
+     `vfan_mask` are emitted by nothing. build_mesh_data.py ships basis_x/basis_y, nbr,
+     grad_x/grad_y (+ the diagonal grad_xd/grad_yd) and no fan at all; mesh_batch.py
+     builds the fan and does the ragged->padded gather.
+  7. `tanb` (B,V,2,3) and `vfan` (B,V,T,2) are ndim>=4, and train_family._flatten_samples
+     squeezes axis 1 of EVERY ndim>=4 batch tensor when SAMPLES == 1. Both would have
+     arrived as (B,2,3) / (B,T,2) with no error anywhere. They are now basis_x/basis_y
+     and fan1/fan2, all ndim<=3, and mesh_batch's smoke test asserts that property.
+  8. the heatmap softmax ran over ALL ~11 000 vertices. At initialisation that puts the
+     expected position at the ear's centroid and the useful gradient is ~1e-4 of the
+     total; the tail also never fully vanishes. It is now a top-k softmax (k vertices,
+     default 32 ~ a 3 mm geodesic disc), which is also what fam_vheat.py does, so the two
+     families differ in BACKBONE and not in decoder.
+  9. HEAD=coordfield silently produced garbage when `tmpl_lm` was absent (it is read out
+     of the batch). It now refuses at construction.
 """
-import os, math
+import os, sys, math, time
 import numpy as np
 import torch
 import torch.nn as nn
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+from mesh_batch import (store, mesh_augment, ring_gather, fan_project, gather_pts,
+                        synth_artefact, MESH_DATA, MESH_SPEC)
 
 NL = 85
 SCALE = 30.0                      # mm normalizer, same as gpu_screen.py
 CONTOURS = [(0, 24), (25, 54), (55, 74), (75, 84)]
 
-WIDTH = int(os.environ.get("WIDTH", "128"))        # channels per DiffusionNet block
-BLOCKS = int(os.environ.get("BLOCKS", "4"))        # number of blocks
-KEIG = int(os.environ.get("KEIG", "128"))          # eigenpairs USED (sliced from the batch)
-DROPOUT = float(os.environ.get("DROPOUT", "0.1"))
+KEIG = int(os.environ.get("KEIG", "128"))          # eigenpairs LOADED (class-level, see above)
 HEAD = os.environ.get("HEAD", "heatmap")           # heatmap | coordfield
-INFEAT = os.environ.get("INFEAT", "xyzhks")        # hks | xyz | xyzhks
-NHKS = int(os.environ.get("NHKS", "16"))           # heat-kernel-signature scales
-TLO = float(os.environ.get("TLO", "1.0"))          # mm^2; diffusion distance 1 mm
-THI = float(os.environ.get("THI", "400.0"))        # mm^2; diffusion distance 20 mm
-TAU = float(os.environ.get("TAU", "1.0"))          # coordfield affinity temperature, mm
-W_SOFT = float(os.environ.get("W_SOFT", "1.0"))    # loss: soft-expected-position term
-W_CE = float(os.environ.get("W_CE", "0.3"))        # loss: heatmap cross-entropy term
-W_FIELD = float(os.environ.get("W_FIELD", "1.0"))  # loss: dense canonical-coordinate term
-STRICT = int(os.environ.get("STRICT", "1"))         # re-check the mass-padding invariant
-                                                    # every forward. Costs one device sync
-                                                    # per step; set 0 once a driver has
-                                                    # verified its packed tensors.
+STRICT = int(os.environ.get("STRICT", "1"))        # re-check the mass-padding invariant
+                                                   # every forward. Costs one device sync
+                                                   # per step; set 0 once a driver has
+                                                   # verified its packed tensors.
 
 # --------------------------------------------------------------------------------------
-# TENSOR CONTRACT required from build_mesh_data.py (which does ALL mesh/connectivity work
-# LOCALLY with numpy/scipy and ships plain padded .npz tensors -- the GPU box has torch
-# and nothing else). One batch is a dict of these; ears in a batch have DIFFERENT vertex
-# counts, so everything is padded to Vmax/Fmax and `vmask` is authoritative.
-# `reference_mesh_tensors()` at the bottom of this file is the executable specification:
-# build_mesh_data.py must reproduce it per ear.
+# TENSOR CONTRACT -- supplied by mesh_batch.MeshStore.pad(), which is the executable
+# specification. Ears in a batch have DIFFERENT vertex counts, so everything is padded to
+# Vmax and `vmask` is authoritative. NOTHING here is ndim >= 4 (defect 7).
 # --------------------------------------------------------------------------------------
 CONTRACT = dict(
-    verts=("(B,Vmax,3) f32", "vertex positions in the per-ear canonical frame, mm; "
-                             "padding rows arbitrary (never read for real vertices)"),
-    vmask=("(B,Vmax) bool", "True for real vertices; authoritative everywhere"),
-    faces=("(B,Fmax,3) i64", "triangles, for diagnostics/regularizers; the model itself "
-                             "only uses vfan"),
-    fmask=("(B,Fmax) bool", "True for real faces"),
-    mass=("(B,Vmax) f32", "lumped (barycentric) vertex areas, mm^2. MUST be EXACTLY 0 on "
-                          "padding -- this is what keeps padding out of the spectral "
-                          "transform"),
+    verts=("(B,V,3) f32", "vertex positions in the per-ear canonical frame, mm; EXACTLY 0 "
+                          "on padding"),
+    vmask=("(B,V) bool", "True for real vertices; authoritative everywhere"),
+    nv=("(B,) i64", "real vertex count per ear"),
+    mass=("(B,V) f32", "lumped (barycentric) vertex areas, mm^2. EXACTLY 0 on padding -- "
+                       "this is what keeps padding out of the spectral transform"),
     evals=("(B,K) f32", "smallest K generalized eigenvalues of the cotan Laplacian "
                         "(L phi = lambda M phi), ascending, >= 0, units 1/mm^2"),
-    evecs=("(B,Vmax,K) f32", "matching eigenvectors, M-orthonormal (evecs^T M evecs = I). "
-                             "MUST be EXACTLY 0 on padding rows"),
-    nrm=("(B,Vmax,3) f32", "unit vertex normals (area-weighted), consistently oriented"),
-    tanb=("(B,Vmax,2,3) f32", "orthonormal tangent basis rows (e1,e2) with e1 x e2 = nrm. "
-                              "grad_wx/grad_wy are expressed in THIS basis"),
-    grad_nbr=("(B,Vmax,R) i64", "1-ring neighbour vertex ids; padding entries = the vertex "
-                                "itself, so their difference is 0"),
-    grad_wx=("(B,Vmax,R) f32", "least-squares tangent-gradient weights, e1 component: "
-                               "grad_e1 u [i] = sum_j wx[i,j] (u[j] - u[i]). 0 on padding"),
-    grad_wy=("(B,Vmax,R) f32", "same, e2 component"),
-    vfan=("(B,Vmax,T,2) i64", "for each vertex, the OTHER TWO vertices of each incident "
-                              "triangle (consistent winding); padded with the vertex "
-                              "itself (degenerate, and masked out anyway)"),
-    vfan_mask=("(B,Vmax,T) bool", "True for real incident triangles"),
-    tmpl_lm=("(85,3) f32", "HEAD=coordfield ONLY: the 85 landmarks in the TEMPLATE's "
-                           "canonical space (barycentric transport of bary_f/bary_w onto "
-                           "the template vertices). FOLD-SCOPED: built from the current "
-                           "fold's TRAINING ears only"),
-    canon_uv=("(B,Vmax,3) f32", "OPTIONAL, TRAIN EARS ONLY, read only inside loss(): the "
-                                "ear's ground-truth canonical coordinate per vertex, from "
-                                "landmark-anchored NICP of the fold's template"),
-    canon_ok=("(B,Vmax) bool", "which vertices have a trustworthy canon_uv"),
+    evecs=("(B,V,K) f32", "matching eigenvectors, M-orthonormal. EXACTLY 0 on padding"),
+    nrm=("(B,V,3) f32", "unit vertex normals (area-weighted), consistently oriented"),
+    basis_x=("(B,V,3) f32", "tangent frame e1; grad_x is expressed in it"),
+    basis_y=("(B,V,3) f32", "tangent frame e2; (e1, e2, n) right-handed"),
+    nbr=("(B,V,D) i64", "1-ring neighbour ids, LOCAL to the padded row; padded slots point "
+                        "at the vertex itself, so their difference is 0"),
+    nbr_mask=("(B,V,D) bool", "True for real one-ring slots"),
+    grad_x=("(B,V,D) f32", "off-diagonal tangent-gradient weights, e1 component: "
+                           "grad_e1 u [i] = sum_j grad_x[i,j] (u[j] - u[i]). 0 on padding"),
+    grad_y=("(B,V,D) f32", "same, e2 component"),
+    fan1=("(B,V,T) i64", "for each vertex, the SECOND corner of each incident triangle "
+                         "(winding preserved); padded with the vertex itself"),
+    fan2=("(B,V,T) i64", "the THIRD corner"),
+    fan_mask=("(B,V,T) bool", "True for real incident triangles"),
+    tmpl_lm=("(85,3) f32", "HEAD=coordfield ONLY, from ARTEFACTS: the 85 landmarks in the "
+                           "TEMPLATE's canonical space. FOLD-SCOPED."),
+    canon_uv=("(B,V,3) f32", "OPTIONAL, TRAIN EARS ONLY, read only inside loss(): the "
+                             "ear's ground-truth canonical coordinate per vertex. NOT "
+                             "PRODUCED BY ANYTHING YET."),
+    canon_ok=("(B,V) bool", "which vertices have a trustworthy canon_uv"),
 )
-
-
-# ------------------------------------------------------------------ tensor plumbing
-def _gather_pts(x, idx):
-    """x (B,V,D), idx (B,...) int64 -> (B,...,D)"""
-    B, _, D = x.shape
-    return torch.gather(x, 1, idx.reshape(B, -1, 1).expand(-1, -1, D)).view(*idx.shape, D)
-
-
-def bary_closest(p, A, B, C, eps=1e-9):
-    """Clamped barycentric coords of the point of triangle (A,B,C) closest to p.
-
-    Ericson's barycentric region algorithm (same regions and the same evaluation order as
-    deep_model/surfproj.closest_on_triangles), but returning the WEIGHTS, which is what
-    makes both heads exactly-on-surface AND differentiable: the returned point is always
-    w0 A + w1 B + w2 C with w >= 0 and sum w = 1, and the weights carry gradient to
-    whichever of p / A / B / C is learned. Degenerate padded triangles (A=B=C) fall into
-    the vertex-A region and return (1,0,0).
-    """
-    ab, ac, ap = B - A, C - A, p - A
-    d1 = (ab * ap).sum(-1); d2 = (ac * ap).sum(-1)
-    bp = p - B
-    d3 = (ab * bp).sum(-1); d4 = (ac * bp).sum(-1)
-    cp = p - C
-    d5 = (ab * cp).sum(-1); d6 = (ac * cp).sum(-1)
-    vc = d1 * d4 - d3 * d2
-    vb = d5 * d2 - d1 * d6
-    va = d3 * d6 - d5 * d4
-    den = va + vb + vc
-
-    def sdiv(n, d):                                   # never divides by ~0, so no inf/nan
-        return n / torch.where(d.abs() > eps, d, torch.full_like(d, eps))
-
-    v, w = sdiv(vb, den), sdiv(vc, den)
-    W = torch.stack([1 - v - w, v, w], -1)            # region 0, interior
-    z, o = torch.zeros_like(v), torch.ones_like(v)
-    t = sdiv(d4 - d3, (d4 - d3) + (d5 - d6)).clamp(0, 1)
-    W = torch.where((((va <= 0) & ((d4 - d3) >= 0) & ((d5 - d6) >= 0)))[..., None],
-                    torch.stack([z, 1 - t, t], -1), W)
-    t = sdiv(d2, d2 - d6).clamp(0, 1)
-    W = torch.where(((vb <= 0) & (d2 >= 0) & (d6 <= 0))[..., None],
-                    torch.stack([1 - t, z, t], -1), W)
-    t = sdiv(d1, d1 - d3).clamp(0, 1)
-    W = torch.where(((vc <= 0) & (d1 >= 0) & (d3 <= 0))[..., None],
-                    torch.stack([1 - t, t, z], -1), W)
-    W = torch.where(((d6 >= 0) & (d5 <= d6))[..., None], torch.stack([z, z, o], -1), W)
-    W = torch.where(((d3 >= 0) & (d4 <= d3))[..., None], torch.stack([z, o, z], -1), W)
-    W = torch.where(((d1 <= 0) & (d2 <= 0))[..., None], torch.stack([o, z, z], -1), W)
-    return W
-
-
-def fan_solve(target, vstar, b, coords, out_coords):
-    """Project `target` onto the incident-triangle fan of vertex `vstar`, in `coords`,
-    and read the answer off `out_coords`.
-
-    HEAD=heatmap  : coords = out_coords = verts  -> exact point-to-surface projection.
-    HEAD=coordfield: coords = predicted canonical field u, out_coords = verts -> exact
-                     barycentric interpolation of the INVERSE canonical map.
-    Returns (point (B,L,3), tri (B,L,3) i64, weights (B,L,3), residual (B,L) in `coords`).
-    """
-    B, L = vstar.shape
-    T = b["vfan"].shape[2]
-    fan = torch.gather(b["vfan"].reshape(B, -1, T * 2), 1,
-                       vstar[..., None].expand(-1, -1, T * 2)).view(B, L, T, 2)
-    msk = torch.gather(b["vfan_mask"], 1, vstar[..., None].expand(-1, -1, T))
-    tri = torch.cat([vstar[..., None, None].expand(-1, -1, T, 1), fan], -1)     # (B,L,T,3)
-    cA, cB, cC = (_gather_pts(coords, tri[..., k]) for k in range(3))
-    W = bary_closest(target[:, :, None, :], cA, cB, cC)                          # (B,L,T,3)
-    P = W[..., 0:1] * cA + W[..., 1:2] * cB + W[..., 2:3] * cC
-    d = (P - target[:, :, None, :]).norm(dim=-1).masked_fill(~msk, 1e9)
-    j = d.argmin(-1)                                                             # (B,L)
-
-    def pick(X):
-        return torch.gather(X, 2, j[..., None, None].expand(-1, -1, 1, X.shape[-1])).squeeze(2)
-
-    Wb, trib = pick(W), pick(tri)
-    oA, oB, oC = (_gather_pts(out_coords, trib[..., k]) for k in range(3))
-    pt = Wb[..., 0:1] * oA + Wb[..., 1:2] * oB + Wb[..., 2:3] * oC
-    return pt, trib, Wb, d.gather(-1, j[..., None]).squeeze(-1)
 
 
 # ------------------------------------------------------------------ intrinsic operators
@@ -211,10 +184,13 @@ def spectral_diffuse(x, evals, evecs, mass, log_t):
 
 
 def tangent_grad(x, nbr, wx, wy):
-    """per-vertex tangent-plane gradient of every channel, in the (e1,e2) basis"""
-    B, V, C = x.shape
-    R = nbr.shape[-1]
-    xj = torch.gather(x, 1, nbr.reshape(B, V * R, 1).expand(-1, -1, C)).view(B, V, R, C)
+    """per-vertex tangent-plane gradient of every channel, in the (e1,e2) basis.
+
+    Written as sum_j w_ij (x_j - x_i), which is IDENTICAL to build_mesh_data.py's
+    grad_xd_i x_i + sum_j grad_x_ij x_j because grad_xd = -sum_j grad_x (verified in
+    mesh_batch.py's smoke test), and needs one fewer tensor.
+    """
+    xj = ring_gather(x, nbr)
     dx = xj - x[:, :, None, :]
     return torch.einsum("bvr,bvrc->bvc", wx, dx), torch.einsum("bvr,bvrc->bvc", wy, dx)
 
@@ -258,14 +234,13 @@ class DiffusionBlock(nn.Module):
 
     def forward(self, x, b):
         d = spectral_diffuse(x, b["evals"], b["evecs"], b["mass"], self.log_t)
-        gr, gi = tangent_grad(d, b["grad_nbr"], b["grad_wx"], b["grad_wy"])
+        gr, gi = tangent_grad(d, b["nbr"], b["grad_x"], b["grad_y"])
         y = self.mlp(torch.cat([x, d, self.gradfeat(gr, gi)], -1))
         return self.norm(x + y) * b["vmask"][..., None]
 
 
 class Backbone(nn.Module):
-    def __init__(self, C=WIDTH, blocks=BLOCKS, dropout=DROPOUT, infeat=INFEAT,
-                 nhks=NHKS, tlo=TLO, thi=THI):
+    def __init__(self, C, blocks, dropout, infeat, nhks, tlo, thi):
         super().__init__()
         self.infeat, self.nhks = infeat, nhks
         self.register_buffer("hks_t", torch.exp(torch.linspace(math.log(tlo), math.log(thi),
@@ -291,19 +266,20 @@ class Backbone(nn.Module):
 
 # ------------------------------------------------------------------ HEAD 1: heatmaps
 class HeatmapHead(nn.Module):
-    """85 per-vertex heatmaps -> masked softmax over vertices -> expected position, then a
-    bounded tangent offset at the argmax vertex projected exactly onto its triangle fan.
+    """85 per-vertex heatmaps -> masked TOP-K softmax -> expected position, then a bounded
+    tangent offset at the peak vertex projected exactly onto an incident triangle.
 
-    KNOWN REACH LIMIT, stated because it decides what this head can and cannot fix: the
-    refinement is bounded by the argmax vertex's 1-ring radius, so the head recovers
-    SUB-VERTEX-SPACING accuracy and nothing more. If the heatmap peak is a millimetre off
-    in PHASE along the contour, this head cannot move it -- the peak has to be right. The
-    soft expected position is unbounded but off-surface, which is why it is used as the
-    gradient carrier rather than as the output, and why HEAD=coordfield exists as the
-    variant whose phase is decided globally instead of by a local peak.
+    REACH. The offset is bounded by the peak vertex's 1-ring radius, but the fan the point
+    is projected onto belongs to the top-k vertex NEAREST the offset point, not to the peak
+    -- so the decoder is not confined to one 1-ring. What it still cannot do is move the
+    PEAK: if the heatmap maximum is a millimetre off in phase along the contour, the
+    top-k window (k vertices ~ a 3 mm geodesic disc at 0.99 mm spacing) is where the
+    answer has to live. That is exactly the failure HEAD=coordfield exists to route
+    around, by deciding phase with a dense global field instead of a local peak.
     """
-    def __init__(self, C, dropout=DROPOUT):
+    def __init__(self, C, dropout, topk, rho):
         super().__init__()
+        self.topk, self.rho = topk, rho
         self.logit = nn.Sequential(nn.Linear(C, C), nn.ReLU(), nn.Dropout(dropout),
                                    nn.Linear(C, NL))
         self.emb = nn.Embedding(NL, 32)
@@ -312,285 +288,340 @@ class HeatmapHead(nn.Module):
     def forward(self, x, b):
         B, V, _ = x.shape
         vm = b["vmask"]
-        logit = self.logit(x).masked_fill(~vm[..., None], -1e9)             # (B,V,NL)
-        w = torch.softmax(logit, dim=1)                                     # over VERTICES
-        p_soft = torch.einsum("bvl,bvd->bld", w, b["verts"])
-        vstar = logit.argmax(1)                                             # (B,NL)
-        pstar = _gather_pts(b["verts"], vstar)
-        tb = _gather_pts(b["tanb"].reshape(B, V, 6), vstar).view(B, NL, 2, 3)
-        hstar = _gather_pts(x, vstar)
-        # bound the offset by the 1-ring radius so the candidate stays inside the fan
-        nb = _gather_pts(b["verts"], b["grad_nbr"].reshape(B, -1)).view(B, V, -1, 3)
-        ring = (nb - b["verts"][:, :, None, :]).norm(dim=-1).max(-1).values.detach()
-        r = _gather_pts(ring[..., None], vstar)                             # (B,NL,1)
+        logit = self.logit(x).masked_fill(~vm[..., None], -1e9)              # (B,V,NL)
+        k = V if self.topk <= 0 else min(self.topk, int(b["nv"].min()))
+        topv, topi = logit.topk(k, dim=1)                                    # (B,k,NL)
+        if STRICT:
+            assert bool(torch.gather(vm, 1, topi.reshape(B, -1)).all()), \
+                "a PADDED vertex entered the top-k softmax"
+        pos = gather_pts(b["verts"], topi.reshape(B, -1)).view(B, k, NL, 3)
+        vstar, pstar = topi[:, 0], pos[:, 0]
+        d2 = ((pos - pstar[:, None]) ** 2).sum(-1)                           # (B,k,NL) mm^2
+        w = torch.softmax(topv - d2 / (2 * self.rho ** 2), dim=1)
+        p_soft = (w[..., None] * pos).sum(1)                                 # (B,NL,3)
+        spread = ((w * ((pos - p_soft[:, None]) ** 2).sum(-1)).sum(1)).clamp(min=0).sqrt()
+
+        # bound the offset by the 1-ring radius so the candidate stays near the fan
+        ring = (ring_gather(b["verts"], b["nbr"]) - b["verts"][:, :, None]
+                ).norm(dim=-1).max(2).values.detach()
+        r = gather_pts(ring[..., None], vstar)                               # (B,NL,1)
         e = self.emb.weight[None].expand(B, -1, -1)
-        duv = r * torch.tanh(self.off(torch.cat([hstar, (p_soft - pstar) / SCALE, e], -1)))
-        q = pstar + duv[..., 0:1] * tb[:, :, 0] + duv[..., 1:2] * tb[:, :, 1]
-        lm, tri, bw, resid = fan_solve(q, vstar, b, b["verts"], b["verts"])
-        return dict(lm=lm, p_soft=p_soft, logit=logit, heat=w, vstar=vstar, q=q,
-                    tri=tri, bary=bw, snap_mm=resid)
+        duv = r * torch.tanh(self.off(torch.cat(
+            [gather_pts(x, vstar), (p_soft - pstar) / SCALE, e], -1)))
+        q = p_soft + duv[..., 0:1] * gather_pts(b["basis_x"], vstar) \
+                   + duv[..., 1:2] * gather_pts(b["basis_y"], vstar)
+        j = (pos - q[:, None]).norm(dim=-1).argmin(1)
+        vfan = torch.gather(topi, 1, j[:, None]).squeeze(1)
+        lm, tri, bw, resid = fan_project(q, vfan, b)
+        return dict(pred=lm, p_soft=p_soft, logit=logit, vstar=vstar, vfan=vfan, q=q,
+                    tri=tri, bary=bw, snap_mm=resid, spread_mm=spread, topk=k)
 
 
 # ------------------------------------------------------------------ HEAD 2: coord field
 class CoordFieldHead(nn.Module):
     """dense per-vertex canonical TEMPLATE coordinate field, landmarks transferred by
     inverting it with exact barycentric interpolation on the fan of the nearest vertex."""
-    def __init__(self, C, dropout=DROPOUT, tau=TAU):
+    def __init__(self, C, dropout, tau, tmpl_lm):
         super().__init__()
         self.field = nn.Sequential(nn.Linear(C, C), nn.ReLU(), nn.Dropout(dropout),
                                    nn.Linear(C, 3))
         self.log_tau = nn.Parameter(torch.tensor(math.log(tau)))
+        self.register_buffer("tmpl_lm", tmpl_lm)
 
     def forward(self, x, b):
         vm = b["vmask"]
-        L = b["tmpl_lm"]                                                    # (85,3)
+        L = self.tmpl_lm                                                    # (85,3)
         u = (L.mean(0) + SCALE * self.field(x)) * vm[..., None]             # (B,V,3)
         tau = torch.exp(self.log_tau).clamp(min=1e-3)
-        # cdist, not a (B,V,85,3) difference tensor: at 30k vertices that intermediate is
-        # 30 MB/ear and autograd keeps it
+        # cdist, not a (B,V,85,3) difference tensor: at 11k vertices that intermediate is
+        # 11 MB/ear and autograd keeps it
         d2 = torch.cdist(u, L[None].expand(u.shape[0], -1, -1)) ** 2        # (B,V,85)
         logit = (-d2 / (2 * tau ** 2)).masked_fill(~vm[..., None], -1e9)
         w = torch.softmax(logit, dim=1)                                     # over VERTICES
         p_soft = torch.einsum("bvl,bvd->bld", w, b["verts"])
         vstar = logit.argmax(1)                                             # (B,85)
         tgt = L[None].expand(x.shape[0], -1, -1)
-        lm, tri, bw, resid = fan_solve(tgt, vstar, b, u, b["verts"])
-        return dict(lm=lm, p_soft=p_soft, u=u, heat=w, vstar=vstar,
+        lm, tri, bw, resid = fan_project(tgt, vstar, b, coords=u, out_coords=b["verts"])
+        return dict(pred=lm, p_soft=p_soft, u=u, logit=logit, vstar=vstar,
                     tri=tri, bary=bw, canon_resid=resid, tau=tau.detach())
 
 
 # ------------------------------------------------------------------ model + loss
 class FamDiffusionNet(nn.Module):
-    def __init__(self, head=HEAD, width=WIDTH, blocks=BLOCKS, keig=KEIG, dropout=DROPOUT,
-                 infeat=INFEAT, nhks=NHKS, tlo=TLO, thi=THI, tau=TAU):
+    DEFAULTS = dict(head=HEAD, width=128, blocks=4, keig=KEIG, dropout=0.1,
+                    infeat="xyzhks", nhks=16, tlo=1.0, thi=400.0, tau=1.0,
+                    topk=32, rho=2.0, sigma=1.0, tgt_gate=1.0,
+                    # w_lm/w_soft are SQUARED MILLIMETRES (~1130 at init); w_ce is nats
+                    # (~9). At 1/1/0.3 the coordinate terms carry ~99% of the gradient and
+                    # they can only reweight the current top-k -- they cannot RELOCATE the
+                    # peak vertex. Measured on the sibling family (fam_vheat, same decoder,
+                    # 2 real ears, 80 steps): 1/1/1 -> 16.40 mm, 0.02/0.02/1 -> 0.50 mm.
+                    w_lm=0.02, w_soft=0.02, w_ce=1.0, w_field=1.0,
+                    lr=1.0e-3, bs=6, wd=1e-4,
+                    aug_rot=0.35, aug_scale=0.0, aug_jit=0.0, aug_qjit=0.0, sub_frac=1.0)
+    SEARCH_SPACE = dict(width=[96, 128, 192], blocks=[3, 4, 6], nhks=[8, 16, 32],
+                        infeat=["hks", "xyz", "xyzhks"], topk=[16, 32, 64],
+                        thi=[100.0, 400.0, 1600.0], sigma=[0.5, 1.0, 2.0],
+                        w_lm=[0.005, 0.02, 0.05], w_soft=[0.005, 0.02, 0.05],
+                        lr=[5e-4, 1e-3, 2e-3],
+                        aug_rot=[0.0, 0.35, 0.8])
+    NEEDS, ROTATES, SAMPLES = (), (), 1
+    AUGMENT = mesh_augment                       # NOT default_augment: see mesh_batch.py
+
+    @staticmethod
+    def BATCH(ears, samples, meta):
+        """Ragged mesh + eigenpairs -> padded batch. KEIG is module-level on purpose.
+
+        meta['mesh_data'] / meta['mesh_spec'] override MESH_DATA / MESH_SPEC; the trainer
+        sets neither, so a real run reads the environment. The smoke test sets them, which
+        is the only way it can exercise THIS hook instead of a hand-built batch.
+        """
+        st = store(meta["dev"], keig=KEIG, path=meta.get("mesh_data"),
+                   spec=meta.get("mesh_spec"))
+        assert int(np.max(ears)) < st.ne, \
+            f"ear {int(np.max(ears))} is outside the {st.ne}-ear mesh artefact"
+        b = st.pad(ears, want_spec=KEIG > 0)
+        tl = meta.get("artefacts", {}).get("tmpl_lm")
+        if tl is not None:
+            b["tmpl_lm"] = torch.as_tensor(np.asarray(tl)).float().to(meta["dev"])
+        return b
+
+    def __init__(self, cfg, meta):
         super().__init__()
-        assert head in ("heatmap", "coordfield"), f"HEAD={head}"
-        self.head_name, self.keig = head, keig
-        self.backbone = Backbone(width, blocks, dropout, infeat, nhks, tlo, thi)
-        self.head = (HeatmapHead(width, dropout) if head == "heatmap"
-                     else CoordFieldHead(width, dropout, tau))
+        head = str(cfg["head"])
+        assert head in ("heatmap", "coordfield"), f"head={head}"
+        assert int(cfg["keig"]) == KEIG, (
+            f"cfg keig={cfg['keig']} but the module loaded KEIG={KEIG}. cls.BATCH is read "
+            f"BEFORE any instance exists, so the number of eigenpairs is a module/env "
+            f"constant: use `KEIG=... FAMILY=diffusionnet ...`, not CFG_KEIG.")
+        self.head_name, self.keig, self.cfg = head, int(cfg["keig"]), cfg
+        C = int(cfg["width"])
+        self.backbone = Backbone(C, int(cfg["blocks"]), float(cfg["dropout"]),
+                                 str(cfg["infeat"]), int(cfg["nhks"]),
+                                 float(cfg["tlo"]), float(cfg["thi"]))
+        if head == "heatmap":
+            self.head = HeatmapHead(C, float(cfg["dropout"]), int(cfg["topk"]),
+                                    float(cfg["rho"]))
+        else:
+            tl = meta.get("artefacts", {}).get("tmpl_lm")
+            assert tl is not None, (
+                "HEAD=coordfield needs `tmpl_lm` (85,3) -- the 85 landmarks in the FOLD's "
+                "template canonical space. No script in this repo emits it. Pass "
+                "ARTEFACTS=<npz with tmpl_lm, fold, train_ear_mask>, which train_family.py "
+                "fold-checks, or use HEAD=heatmap. Refusing rather than inventing one.")
+            self.head = CoordFieldHead(C, float(cfg["dropout"]), float(cfg["tau"]),
+                                       torch.as_tensor(np.asarray(tl)).float())
 
     def forward(self, b):
         # `mass` zero on padding is the ONE contract invariant the masking rests on: it is
         # what keeps padded vertices out of the spectral transform. Everything else is
         # masked explicitly (softmaxes, block outputs, 1-ring weights, triangle fans).
-        assert not STRICT or float((b["mass"] * ~b["vmask"]).abs().max()) == 0.0, \
-            "contract violation: mass must be EXACTLY 0 on padded vertices"
+        if STRICT:
+            assert float((b["mass"] * ~b["vmask"]).abs().max()) == 0.0, \
+                "contract violation: mass must be EXACTLY 0 on padded vertices"
+            assert float((b["evecs"] * ~b["vmask"][..., None]).abs().max()) == 0.0, \
+                "contract violation: evecs must be EXACTLY 0 on padded vertices"
         b = dict(b)
         b["evals"] = b["evals"][:, :self.keig]
         b["evecs"] = b["evecs"][..., :self.keig]
         out = self.head(self.backbone(b), b)
-        assert out["lm"].shape[1:] == (NL, 3)
+        assert out["pred"].shape[1:] == (NL, 3), out["pred"].shape
         return out
 
-    def loss(self, out, target, b, w_soft=W_SOFT, w_ce=W_CE, w_field=W_FIELD):
+    def loss(self, out, target, b):
         """target (B,85,3) GT landmarks in the canonical frame -- TRAIN-FOLD EARS ONLY.
 
-        Every term is restricted to real vertices: the softmax weights are already
-        exactly 0 on padding, the cross-entropy target vertex is chosen among real
+        Returns a SCALAR (train_family.py calls .backward() on it); the breakdown lands in
+        self.last_terms. Every term is restricted to real vertices: the softmax weights are
+        already exactly 0 on padding, the cross-entropy target is a distribution over real
         vertices only, and the dense field term is averaged over canon_ok & vmask.
         """
+        c = self.cfg
         vm = b["vmask"]
-        terms = {"lm": ((out["lm"] - target) ** 2).sum(-1).mean(),
+        terms = {"lm": ((out["pred"] - target) ** 2).sum(-1).mean(),
                  "soft": ((out["p_soft"] - target) ** 2).sum(-1).mean()}
-        total = terms["lm"] + w_soft * terms["soft"]
-        if self.head_name == "heatmap" and w_ce > 0:
-            d = torch.cdist(target, b["verts"]).masked_fill(~vm[:, None, :], 1e9)
-            vt = d.argmin(-1)                                               # (B,85)
+        total = float(c["w_lm"]) * terms["lm"] + float(c["w_soft"]) * terms["soft"]
+        if self.head_name == "heatmap" and float(c["w_ce"]) > 0:
+            # SPATIAL target, not a one-hot: a hard argmax label cannot express sub-vertex
+            # precision, and its gradient is zero the moment the peak vertex is correct.
+            d = torch.cdist(target, b["verts"])                             # (B,NL,V) mm
+            s = float(c["sigma"])
+            t = torch.exp(-(d ** 2) / (2 * s * s))
+            if float(c["tgt_gate"]) > 0:
+                vt = d.masked_fill(~vm[:, None, :], 1e9).argmin(-1)
+                cosn = torch.einsum("bld,bvd->blv", gather_pts(b["nrm"], vt),
+                                    b["nrm"]).clamp(min=0)
+                t = t * cosn ** float(c["tgt_gate"])
+            t = (t * vm[:, None, :]).clamp(min=0)
+            t = t / t.sum(-1, keepdim=True).clamp(min=1e-20)
             lp = torch.log_softmax(out["logit"], dim=1).transpose(1, 2)     # (B,NL,V)
-            terms["ce"] = -torch.gather(lp, 2, vt[..., None]).mean()
-            total = total + w_ce * terms["ce"]
-        if self.head_name == "coordfield" and "canon_uv" in b and w_field > 0:
+            terms["ce"] = -(t * lp).sum(-1).mean()
+            total = total + float(c["w_ce"]) * terms["ce"]
+        if self.head_name == "coordfield" and "canon_uv" in b and float(c["w_field"]) > 0:
             ok = (b["canon_ok"] & vm).float()
             terms["field"] = (((out["u"] - b["canon_uv"]) ** 2).sum(-1) * ok).sum() \
                 / ok.sum().clamp(min=1.0)
-            total = total + w_field * terms["field"]
-        return total, {k: float(v.detach()) for k, v in terms.items()}
+            total = total + float(c["w_field"]) * terms["field"]
+        self.last_terms = {k: round(float(v.detach()), 5) for k, v in terms.items()}
+        return total
+
+
+MODEL = FamDiffusionNet
 
 
 # ======================================================================================
-# REFERENCE PREPROCESSING -- the executable specification of the CONTRACT above.
-# build_mesh_data.py must produce exactly these fields, per ear, LOCALLY (numpy/scipy),
-# and ship them padded in a .npz. Nothing below ever runs on the GPU box.
+# LOCAL PREPROCESSING for the smoke test only: the eigenpairs mesh_spec.npz would carry.
+# The real artefact comes from build_mesh_data.py; this rebuilds them for a synthetic
+# mesh_data.npz so the test drives the ACTUAL loader instead of hand-packed tensors.
 # ======================================================================================
-def reference_mesh_tensors(V, F, keig):
-    """cotan Laplacian eigenpairs, lumped mass, normals, tangent basis, 1-ring LSQ
-    gradient weights and the incident-triangle fan for ONE ear."""
+def synth_spec(mesh_path, spec_path, keig):
     import scipy.sparse as sp
-    import scipy.sparse.linalg as spl
-    V = np.asarray(V, np.float64); F = np.asarray(F, np.int64)
-    n = len(V)
-    i0, i1, i2 = F[:, 0], F[:, 1], F[:, 2]
-    e0, e1, e2 = V[i2] - V[i1], V[i0] - V[i2], V[i1] - V[i0]
-    cr = np.cross(e2, -e1)                                    # 2*area * face normal
-    a2 = np.maximum(np.linalg.norm(cr, axis=1), 1e-14)
-    cot = np.stack([-(e1 * e2).sum(1), -(e2 * e0).sum(1), -(e0 * e1).sum(1)]) / a2
-    ii = np.r_[i1, i2, i2, i0, i0, i1]
-    jj = np.r_[i2, i1, i0, i2, i1, i0]
-    ww = 0.5 * np.r_[cot[0], cot[0], cot[1], cot[1], cot[2], cot[2]]
-    Wm = sp.coo_matrix((ww, (ii, jj)), shape=(n, n)).tocsr()
-    Lap = (sp.diags(np.asarray(Wm.sum(1)).ravel()) - Wm).tocsc()
-    mass = np.zeros(n)
-    np.add.at(mass, F.ravel(), np.repeat(a2 / 6.0, 3))        # barycentric lumping
-    mass = np.maximum(mass, 1e-9)
-    k = min(keig, n - 2)
-    vals, vecs = spl.eigsh(Lap, k=k, M=sp.diags(mass).tocsc(), sigma=-1e-5, which="LM")
-    o = np.argsort(vals)
-    vals, vecs = np.maximum(vals[o], 0.0), vecs[:, o]
-    vecs = vecs / np.sqrt((mass[:, None] * vecs ** 2).sum(0, keepdims=True))
-    nrm = np.zeros((n, 3))
-    np.add.at(nrm, F.ravel(), np.repeat(cr, 3, axis=0))
-    nrm = nrm / np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-12)
-    ax = np.where((np.abs(nrm[:, 0:1]) > 0.9), np.array([[0., 1., 0.]]), np.array([[1., 0., 0.]]))
-    e_1 = ax - (ax * nrm).sum(1, keepdims=True) * nrm
-    e_1 = e_1 / np.maximum(np.linalg.norm(e_1, axis=1, keepdims=True), 1e-12)
-    tanb = np.stack([e_1, np.cross(nrm, e_1)], 1)                          # e1 x e2 = nrm
-    nbrs = [set() for _ in range(n)]
-    fans = [[] for _ in range(n)]
-    for a, bb, c in F:
-        nbrs[a] |= {bb, c}; nbrs[bb] |= {c, a}; nbrs[c] |= {a, bb}
-        fans[a].append((bb, c)); fans[bb].append((c, a)); fans[c].append((a, bb))
-    R = max(len(s) for s in nbrs); T = max(len(f) for f in fans)
-    nbr = np.tile(np.arange(n)[:, None], (1, R))
-    wx = np.zeros((n, R)); wy = np.zeros((n, R))
-    for i, s in enumerate(nbrs):
-        j = np.fromiter(sorted(s), int)
-        D = (V[j] - V[i]) @ tanb[i].T                                      # (deg,2)
-        G = np.linalg.solve(D.T @ D + 1e-6 * np.eye(2), D.T)                # (2,deg)
-        nbr[i, :len(j)] = j; wx[i, :len(j)] = G[0]; wy[i, :len(j)] = G[1]
-    fan = np.tile(np.arange(n)[:, None, None], (1, T, 2))
-    fmk = np.zeros((n, T), bool)
-    for i, f in enumerate(fans):
-        fan[i, :len(f)] = np.asarray(f); fmk[i, :len(f)] = True
-    return dict(verts=V, faces=F, mass=mass, evals=vals, evecs=vecs, nrm=nrm, tanb=tanb,
-                grad_nbr=nbr, grad_wx=wx, grad_wy=wy, vfan=fan, vfan_mask=fmk)
-
-
-def pack_batch(ears, device="cpu"):
-    """pad a list of reference_mesh_tensors() dicts (DIFFERENT vertex counts) into a batch"""
-    Vmax = max(len(e["verts"]) for e in ears)
-    Fmax = max(len(e["faces"]) for e in ears)
-    K = min(len(e["evals"]) for e in ears)
-    R = max(e["grad_nbr"].shape[1] for e in ears)
-    T = max(e["vfan"].shape[1] for e in ears)
-    B = len(ears)
-    b = dict(verts=np.zeros((B, Vmax, 3), np.float32), vmask=np.zeros((B, Vmax), bool),
-             faces=np.zeros((B, Fmax, 3), np.int64), fmask=np.zeros((B, Fmax), bool),
-             mass=np.zeros((B, Vmax), np.float32), evals=np.zeros((B, K), np.float32),
-             evecs=np.zeros((B, Vmax, K), np.float32), nrm=np.zeros((B, Vmax, 3), np.float32),
-             tanb=np.zeros((B, Vmax, 2, 3), np.float32),
-             grad_nbr=np.zeros((B, Vmax, R), np.int64),
-             grad_wx=np.zeros((B, Vmax, R), np.float32),
-             grad_wy=np.zeros((B, Vmax, R), np.float32),
-             vfan=np.zeros((B, Vmax, T, 2), np.int64),
-             vfan_mask=np.zeros((B, Vmax, T), bool))
-    for i, e in enumerate(ears):
-        n, m = len(e["verts"]), len(e["faces"])
-        b["verts"][i, :n] = e["verts"]; b["vmask"][i, :n] = True
-        b["faces"][i, :m] = e["faces"]; b["fmask"][i, :m] = True
-        b["mass"][i, :n] = e["mass"]                        # exactly 0 beyond n
-        b["evals"][i] = e["evals"][:K]
-        b["evecs"][i, :n] = e["evecs"][:, :K]               # exactly 0 beyond n
-        b["nrm"][i, :n] = e["nrm"]; b["tanb"][i, :n] = e["tanb"]
-        b["grad_nbr"][i] = np.arange(Vmax)[:, None]         # padding points at itself
-        b["grad_nbr"][i, :n, :e["grad_nbr"].shape[1]] = e["grad_nbr"]
-        b["grad_wx"][i, :n, :e["grad_wx"].shape[1]] = e["grad_wx"]
-        b["grad_wy"][i, :n, :e["grad_wy"].shape[1]] = e["grad_wy"]
-        b["vfan"][i] = np.arange(Vmax)[:, None, None]
-        b["vfan"][i, :n, :e["vfan"].shape[1]] = e["vfan"]
-        b["vfan_mask"][i, :n, :e["vfan_mask"].shape[1]] = e["vfan_mask"]
-    return {k: torch.tensor(v).to(device) for k, v in b.items()}
+    import scipy.sparse.linalg as spla
+    z = np.load(mesh_path)
+    vp, dp = z["v_ptr"], z["deg_ptr"]
+    E = len(vp) - 1
+    evals = np.zeros((E, keig), np.float32)
+    evecs = np.zeros((int(vp[-1]), keig), np.float16)
+    for e in range(E):
+        g0, g1 = int(vp[e]), int(vp[e + 1]); n = g1 - g0
+        d0, d1 = int(dp[g0]), int(dp[g1])
+        row = np.repeat(np.arange(n), np.diff(dp[g0:g1 + 1]))
+        col = z["nbr"][d0:d1].astype(np.int64) - g0
+        W = sp.coo_matrix((z["lap_w"][d0:d1].astype(np.float64), (row, col)),
+                          shape=(n, n)).tocsc()
+        L = (sp.diags(z["lap_diag"][g0:g1].astype(np.float64)) - W).tocsc()
+        M = sp.diags(z["mass"][g0:g1].astype(np.float64)).tocsc()
+        ev, ec = spla.eigsh(L, k=keig, M=M, sigma=-1e-8, which="LM")
+        o = np.argsort(ev)
+        evals[e], evecs[g0:g1] = np.clip(ev[o], 0, None), ec[:, o]
+    np.savez(spec_path, evals=evals, evecs=evecs, v_ptr=vp,
+             n_eig=np.full(E, keig, np.int32))
+    return spec_path
 
 
 # ======================================================================================
 if __name__ == "__main__":
-    import time
     t0 = time.time()
     torch.manual_seed(0); np.random.seed(0)
+    dev = "cpu"
+    K = int(os.environ.get("SMOKE_KEIG", "32"))
+    KEIG = K                                          # the class-level constant BATCH reads
+    print("=" * 86)
 
-    def synth_ear(nu, nv, seed):
-        """a curved triangulated patch at ear mm-scale -- real connectivity, so the
-        Laplacian, the gradient operator and the triangle fans are all genuine."""
-        rs = np.random.RandomState(seed)
-        u = np.linspace(0, 40, nu); v = np.linspace(0, 30, nv)
-        U, Vv = np.meshgrid(u, v, indexing="ij")
-        Z = 6 * np.sin(U / 9.0) * np.cos(Vv / 7.0) + 0.15 * rs.randn(nu, nv)
-        P = np.stack([U, Vv, Z], -1).reshape(-1, 3)
-        idx = np.arange(nu * nv).reshape(nu, nv)
-        a, bb = idx[:-1, :-1].ravel(), idx[1:, :-1].ravel()
-        c, dd = idx[1:, 1:].ravel(), idx[:-1, 1:].ravel()
-        Fq = np.concatenate([np.stack([a, bb, c], -1), np.stack([a, c, dd], -1)])
-        return P, Fq
-
-    ears = [reference_mesh_tensors(*synth_ear(20, 18, 0), keig=KEIG),
-            reference_mesh_tensors(*synth_ear(24, 22, 1), keig=KEIG)]
-    ns = [len(e["verts"]) for e in ears]
-    print(f"synthetic batch: B=2 ears with {ns[0]} and {ns[1]} vertices (DIFFERENT), "
-          f"{len(ears[0]['evals'])} eigenpairs")
-    b = pack_batch(ears)
-    print(f"padded shapes: verts {tuple(b['verts'].shape)} evecs {tuple(b['evecs'].shape)} "
-          f"grad_nbr {tuple(b['grad_nbr'].shape)} vfan {tuple(b['vfan'].shape)}")
-    for i, n in enumerate(ns):
+    tmp = os.environ.get("SMOKE_DIR", os.path.join(os.environ.get("TMPDIR", "/tmp"), "dnet"))
+    os.makedirs(tmp, exist_ok=True)
+    mp = synth_artefact(os.path.join(tmp, "synth_mesh.npz"))
+    spp = synth_spec(mp, os.path.join(tmp, "synth_spec.npz"), K)
+    st = store(dev, keig=K, path=mp, spec=spp)
+    ns = [int(x) for x in st.nv]
+    meta = dict(nl=NL, contours=CONTOURS, scale=SCALE, npts=2048, fold=0, dev=dev,
+                n_train_ears=3, artefacts={}, mesh_data=mp, mesh_spec=spp)
+    b = FamDiffusionNet.BATCH(np.array([0, 1]), None, meta)
+    z = np.load(mp)
+    b["coarse"] = torch.tensor(z["coarse"][:2]).float()
+    B, P = b["verts"].shape[:2]
+    print(f"synthetic RAGGED artefact through the REAL loader: 3 ears {ns}, "
+          f"batch of 2 padded to {P}, {K} eigenpairs")
+    for i, n in enumerate(ns[:2]):
         G = (b["evecs"][i, :n].T * b["mass"][i, :n]) @ b["evecs"][i, :n]
-        off = (G - torch.eye(G.shape[0])).abs().max().item()
-        print(f"  ear{i}: M-orthonormality |evecs^T M evecs - I|_max = {off:.2e}, "
-              f"lambda_1 = {b['evals'][i, 1]:.5f} 1/mm^2, area = {b['mass'][i].sum():.1f} mm^2")
+        print(f"  ear{i}: |evecs^T M evecs - I|_max {float((G-torch.eye(K)).abs().max()):.2e}"
+              f"  lambda_1 {float(b['evals'][i,1]):.5f} 1/mm^2  area "
+              f"{float(b['mass'][i].sum()):.1f} mm^2")
+    assert all(v.dim() <= 3 for v in b.values() if torch.is_tensor(v)), \
+        "a batch tensor is ndim>=4: train_family._flatten_samples would squeeze axis 1"
+    print("  no batch tensor is ndim>=4 (defect 7)")
 
-    # the template's canonical landmark positions (fold-scoped artefact; synthetic here)
-    P0 = ears[0]["verts"]
-    b["tmpl_lm"] = torch.tensor(P0[np.linspace(0, len(P0) - 1, NL).astype(int)]).float()
-    b["canon_uv"] = b["verts"].clone()
-    b["canon_ok"] = b["vmask"].clone()
-    target = b["tmpl_lm"][None].expand(2, -1, -1) + torch.randn(2, NL, 3) * 0.5
+    # exact on-surface GT from the artefact's (face, barycentric) encoding
+    tri0 = torch.tensor(z["faces"].astype(np.int64))[z["lm_face"][:2].astype(np.int64)] \
+        - st.v_ptr[:2, None, None]
+    gt = (torch.tensor(z["lm_bary"][:2]).float()[..., None]
+          * gather_pts(b["verts"], tri0.reshape(2, -1)).view(2, NL, 3, 3)).sum(2)
 
-    for head in ("heatmap", "coordfield"):
-        net = FamDiffusionNet(head=head)
+    cfg0 = {**FamDiffusionNet.DEFAULTS, "keig": K, "width": 64, "blocks": 2, "nhks": 8}
+    meta_cf = dict(meta, artefacts={"tmpl_lm": gt[0].numpy()})
+    for head, m in (("heatmap", meta), ("coordfield", meta_cf)):
+        cfg = {**cfg0, "head": head}
+        net = FamDiffusionNet(cfg, m)
         npar = sum(p.numel() for p in net.parameters())
-        out = net(b)
-        lm = out["lm"]
-        assert lm.shape == (2, NL, 3), lm.shape
-        loss, terms = net.loss(out, target, b)
+        bb = dict(b)
+        if head == "coordfield":
+            bb["canon_uv"] = b["verts"].clone(); bb["canon_ok"] = b["vmask"].clone()
+        out = net(bb)
+        assert out["pred"].shape == (2, NL, 3), out["pred"].shape
+        loss = net.loss(out, gt, bb)
+        assert torch.is_tensor(loss) and loss.dim() == 0, "loss must be a SCALAR (defect 5)"
         loss.backward()
         gs = {n: float(p.grad.norm()) for n, p in net.named_parameters() if p.grad is not None}
-        assert len(gs) == len(list(net.parameters())), "some parameters received no gradient"
+        assert len(gs) == len(list(net.parameters())), \
+            f"no gradient reached {[n for n,_ in net.named_parameters() if n not in gs]}"
         assert all(np.isfinite(v) for v in gs.values()), "non-finite gradient"
         gn = sum(v ** 2 for v in gs.values()) ** .5
-        # exactly-on-surface: the output IS a convex barycentric point of a real triangle
-        tri = out["tri"]
-        rec = (out["bary"][..., None] * _gather_pts(b["verts"], tri.reshape(2, -1))
-               .view(2, NL, 3, 3)).sum(2)
-        assert out["bary"].min() >= -1e-6 and (out["bary"].sum(-1) - 1).abs().max() < 1e-5
-        assert (rec - lm).abs().max() < 1e-4, (rec - lm).abs().max()
-        # masked vertices must not influence anything
+        rec = (out["bary"][..., None]
+               * gather_pts(b["verts"], out["tri"].reshape(2, -1)).view(2, NL, 3, 3)).sum(2)
+        assert float(out["bary"].min()) >= -1e-6 and \
+            float((out["bary"].sum(-1) - 1).abs().max()) < 1e-5
+        assert float((rec - out["pred"]).abs().max()) < 1e-4
+        print(f"\nHEAD={head:10s} params {npar:,}  pred {tuple(out['pred'].shape)}  "
+              f"loss {float(loss):.4f} {net.last_terms}")
+        print(f"  grad-norm {gn:.4e}; log_t {gs['backbone.blocks.0.log_t']:.3e}, gradfeat "
+              f"{gs['backbone.blocks.0.gradfeat.Wr.weight']:.3e} -> the intrinsic path is live")
+        print(f"  learned t range {float(net.backbone.blocks[0].log_t.exp().min()):.2f}"
+              f"-{float(net.backbone.blocks[0].log_t.exp().max()):.1f} mm^2; "
+              + (f"k={out['topk']} spread {float(out['spread_mm'].mean()):.3f} mm snap "
+                 f"{float(out['snap_mm'].mean()):.4f} mm" if head == "heatmap" else
+                 f"canon resid {float(out['canon_resid'].mean()):.4f} tau "
+                 f"{float(out['tau']):.3f}"))
+        print(f"  on-surface: bary in the simplex, |reconstruction - pred|_max "
+              f"{float((rec-out['pred']).abs().max()):.1e}")
+
+        # padded vertices must not influence anything
         net.eval()
-        ref = net(b)["lm"].detach().clone()
-        b2 = dict(b)
-        for key in ("verts", "nrm", "evecs", "tanb"):
-            t = b[key].clone()
-            for i, n in enumerate(ns):
+        ref = net(bb)["pred"].detach().clone()
+        b2 = dict(bb)
+        for key in ("verts", "nrm", "basis_x", "basis_y", "evecs"):
+            t = bb[key].clone()
+            for i, n in enumerate(ns[:2]):
                 t[i, n:] = torch.randn_like(t[i, n:]) * 100
             b2[key] = t
-        d_mask = (net(b2)["lm"].detach() - ref).abs().max().item()
+        globals()["STRICT"] = 0
+        d_mask = float((net(b2)["pred"].detach() - ref).abs().max())
+        globals()["STRICT"] = 1
         assert d_mask == 0.0, f"padded vertices leaked into the output ({d_mask})"
+        w_all = torch.softmax(net(bb)["logit"], dim=1)
+        assert float(w_all.masked_select(~bb["vmask"][..., None]).abs().max()) == 0.0
+        print(f"  padding: |delta|={d_mask:.1e} with junk in every padded row, softmax "
+              f"weight on padding exactly 0")
         net.train()
-        print(f"\nHEAD={head:10s} params {npar:,}  out {tuple(lm.shape)}  "
-              f"loss {float(loss):.4f} {terms}")
-        print(f"  grad-norm {gn:.4e}  bary in simplex OK  on-surface reconstruction OK  "
-              f"padding-invariance |delta|={d_mask:.1e}")
-        # the intrinsic path must be live, not a dead branch beside the xyz channels
-        print(f"  grad reaches log_t {gs['backbone.blocks.0.log_t']:.3e} and gradfeat "
-              f"{gs['backbone.blocks.0.gradfeat.Wr.weight']:.3e}")
-        print(f"  learned t range {float(net.backbone.blocks[0].log_t.exp().min()):.2f}"
-              f"-{float(net.backbone.blocks[0].log_t.exp().max()):.1f} mm^2  "
-              + (f"snap {float(out['snap_mm'].mean()):.4f} mm" if head == "heatmap"
-                 else f"canon resid {float(out['canon_resid'].mean()):.4f} mm "
-                      f"tau {float(out['tau']):.3f}"))
+
+    # HEAD=coordfield must REFUSE to be built without its fold-scoped artefact (defect 9)
+    try:
+        FamDiffusionNet({**cfg0, "head": "coordfield"}, meta)
+        raise SystemExit("coordfield was built with no tmpl_lm -- it would emit garbage")
+    except AssertionError as e:
+        assert "tmpl_lm" in str(e)
+    # CFG_KEIG must not be able to diverge from the loaded KEIG (defect: silent slicing)
+    try:
+        FamDiffusionNet({**cfg0, "keig": K + 1}, meta)
+        raise SystemExit("cfg keig was allowed to diverge from the module KEIG")
+    except AssertionError as e:
+        assert "BEFORE any instance exists" in str(e)
+    print("\n  refused: coordfield without tmpl_lm; cfg keig != module KEIG")
 
     # the diffusion operator really is the heat kernel: t -> inf goes to the mass-mean
-    x = torch.randn(2, b["verts"].shape[1], 1) * b["vmask"][..., None]
+    x = torch.randn(2, P, 1) * b["vmask"][..., None]
     big = spectral_diffuse(x, b["evals"], b["evecs"], b["mass"], torch.tensor([12.0]))
     mean = ((b["mass"][..., None] * x).sum(1) / b["mass"].sum(1)[:, None])
-    print(f"\nheat-kernel check: |diffuse(t=e^12) - mass-mean|_max = "
-          f"{float(((big - mean[:, None]) * b['vmask'][..., None]).abs().max()):.2e}")
-    print(f"smoke test OK in {time.time()-t0:.1f}s on "
-          f"{'cuda' if torch.cuda.is_available() else 'cpu'}")
+    err = float(((big - mean[:, None]) * b["vmask"][..., None]).abs().max())
+    print(f"  heat-kernel check: |diffuse(t=e^12) - mass-mean|_max = {err:.2e}")
+    assert err < 5e-3, err
+
+    # the trainer's contract, checked as the trainer reads it
+    for k in ("DEFAULTS", "NEEDS", "ROTATES", "SAMPLES", "BATCH", "AUGMENT"):
+        assert hasattr(FamDiffusionNet, k), k
+    assert MODEL is FamDiffusionNet
+    assert FamDiffusionNet.AUGMENT.__name__ == "mesh_augment"
+    assert not set(FamDiffusionNet.NEEDS)
+    print(f"  FAMILY CONTRACT: MODEL present, NEEDS=(), AUGMENT=mesh_augment, "
+          f"BATCH hook returns {len(b)} mesh tensors")
+    print(f"\nSMOKE PASS in {time.time()-t0:.1f}s on {dev}")
+    print("=" * 86)
