@@ -1,0 +1,401 @@
+{
+ "config": {
+  "work": "scratch",
+  "models": [
+   "base"
+  ],
+  "seeds": [
+   0,
+   1,
+   2
+  ],
+  "seed_mode": "separate",
+  "pred": "raw",
+  "simplex": false,
+  "rho": 1000000.0,
+  "ridge": 0.0,
+  "dup_r": 0.95,
+  "nb": 20000,
+  "boot_seed": 5,
+  "ens_npy": "ensemble_oof.npy",
+  "out": "research/results/ensemble.json",
+  "feats": "scratch/ortho_feats.npz"
+ },
+ "n_ears": 340,
+ "n_subjects": 170,
+ "fold_check": "frozen rule + ortho_feats.npz + research/results/folds.json",
+ "members": {
+  "base#s0": {
+   "spec": "base",
+   "seeds": [
+    0
+   ],
+   "per_fold_MLE": {
+    "0": 1.3392,
+    "1": 1.2983,
+    "2": 1.3971,
+    "3": 1.2549,
+    "4": 1.3126
+   },
+   "pooled_OOF_MLE_mm": 1.3204,
+   "per_contour_MLE_mm": {
+    "outer_helix": 1.3526,
+    "concha": 1.0631,
+    "inner_helix": 1.6123,
+    "sup._antihelix": 1.4282
+   },
+   "directional_rmse_mm": {
+    "tangent_t": 1.4456,
+    "across_b": 0.7233,
+    "normal_n": 0.2822
+   }
+  },
+  "base#s1": {
+   "spec": "base",
+   "seeds": [
+    1
+   ],
+   "per_fold_MLE": {
+    "0": 1.3389,
+    "1": 1.2649,
+    "2": 1.3608,
+    "3": 1.2698,
+    "4": 1.3084
+   },
+   "pooled_OOF_MLE_mm": 1.3086,
+   "per_contour_MLE_mm": {
+    "outer_helix": 1.3228,
+    "concha": 1.0782,
+    "inner_helix": 1.5819,
+    "sup._antihelix": 1.4175
+   },
+   "directional_rmse_mm": {
+    "tangent_t": 1.4279,
+    "across_b": 0.7208,
+    "normal_n": 0.286
+   }
+  }
+ },
+ "best_single_model": "base#s1",
+ "diversity": {
+  "r_signed_matrix": {
+   "base#s0": {
+    "base#s0": 1.0,
+    "base#s1": 0.9167
+   },
+   "base#s1": {
+    "base#s0": 0.9167,
+    "base#s1": 1.0
+   }
+  },
+  "pairs": [
+   {
+    "a": "base#s0",
+    "b": "base#s1",
+    "r_signed_all": 0.9167,
+    "r_within_ear": 0.8943,
+    "r_within_landmark": 0.9118,
+    "r_per_ear_MLE": 0.9096,
+    "r_signed_per_contour": {
+     "outer_helix": 0.9067,
+     "concha": 0.9075,
+     "inner_helix": 0.9378,
+     "sup._antihelix": 0.8956
+    },
+    "equal_weight_pair_MLE_mm": 1.2822,
+    "best_of_pair_MLE_mm": 1.3086,
+    "pair_gain_mm": -0.0264,
+    "near_duplicate": false
+   }
+  ],
+  "dup_threshold": 0.95,
+  "near_duplicate_pairs": [],
+  "mean_off_diagonal_r": 0.9167
+ },
+ "weights": {
+  "contours": [
+   "outer_helix",
+   "concha",
+   "inner_helix",
+   "sup._antihelix"
+  ],
+  "nested_per_outer_fold": [
+   {
+    "base#s0": [
+     0.367843,
+     0.545066,
+     0.320008,
+     0.397262
+    ],
+    "base#s1": [
+     0.632286,
+     0.455059,
+     0.678591,
+     0.60339
+    ]
+   },
+   {
+    "base#s0": [
+     0.479882,
+     0.546571,
+     0.402436,
+     0.51575
+    ],
+    "base#s1": [
+     0.520149,
+     0.453601,
+     0.596916,
+     0.484144
+    ]
+   },
+   {
+    "base#s0": [
+     0.464134,
+     0.590013,
+     0.337632,
+     0.546903
+    ],
+    "base#s1": [
+     0.535582,
+     0.409957,
+     0.660965,
+     0.452302
+    ]
+   },
+   {
+    "base#s0": [
+     0.399503,
+     0.568551,
+     0.204909,
+     0.409621
+    ],
+    "base#s1": [
+     0.600844,
+     0.431322,
+     0.793738,
+     0.590543
+    ]
+   },
+   {
+    "base#s0": [
+     0.457663,
+     0.576358,
+     0.325324,
+     0.459919
+    ],
+    "base#s1": [
+     0.542613,
+     0.4236,
+     0.673806,
+     0.540449
+    ]
+   }
+  ],
+  "nested_mean": {
+   "base#s0": [
+    0.433805,
+    0.565312,
+    0.318062,
+    0.465891
+   ],
+   "base#s1": [
+    0.566295,
+    0.434708,
+    0.680803,
+    0.534165
+   ]
+  },
+  "nested_sd": {
+   "base#s0": [
+    0.047801,
+    0.019389,
+    0.071348,
+    0.065117
+   ],
+   "base#s1": [
+    0.047911,
+    0.019485,
+    0.071131,
+    0.065601
+   ]
+  },
+  "in_sample_LEAKY": {
+   "base#s0": [
+    0.435254,
+    0.565135,
+    0.318389,
+    0.466045
+   ],
+   "base#s1": [
+    0.564845,
+    0.434883,
+    0.680477,
+    0.534002
+   ]
+  },
+  "solver_diagnostics_in_sample": [
+   {
+    "contour": "outer_helix",
+    "rows": 25500,
+    "sum_w": 1.0001,
+    "cond_A": 258.6,
+    "fit_rms_mm": 0.902,
+    "active": 2
+   },
+   {
+    "contour": "concha",
+    "rows": 30600,
+    "sum_w": 1.000018,
+    "cond_A": 289.4,
+    "fit_rms_mm": 0.7324,
+    "active": 2
+   },
+   {
+    "contour": "inner_helix",
+    "rows": 20400,
+    "sum_w": 0.998866,
+    "cond_A": 254.7,
+    "fit_rms_mm": 1.161,
+    "active": 2
+   },
+   {
+    "contour": "sup._antihelix",
+    "rows": 10200,
+    "sum_w": 1.000047,
+    "cond_A": 236.9,
+    "fit_rms_mm": 0.9369,
+    "active": 2
+   }
+  ]
+ },
+ "nested_disjointness": [
+  {
+   "outer_fold": 0,
+   "n_fit_ears": 272,
+   "n_eval_ears": 68,
+   "ear_overlap": 0,
+   "subject_overlap": 0,
+   "in_fit_MLE_mm": 1.2743,
+   "held_out_MLE_mm": 1.3077
+  },
+  {
+   "outer_fold": 1,
+   "n_fit_ears": 272,
+   "n_eval_ears": 68,
+   "ear_overlap": 0,
+   "subject_overlap": 0,
+   "in_fit_MLE_mm": 1.29,
+   "held_out_MLE_mm": 1.2445
+  },
+  {
+   "outer_fold": 2,
+   "n_fit_ears": 272,
+   "n_eval_ears": 68,
+   "ear_overlap": 0,
+   "subject_overlap": 0,
+   "in_fit_MLE_mm": 1.2636,
+   "held_out_MLE_mm": 1.3538
+  },
+  {
+   "outer_fold": 3,
+   "n_fit_ears": 272,
+   "n_eval_ears": 68,
+   "ear_overlap": 0,
+   "subject_overlap": 0,
+   "in_fit_MLE_mm": 1.2929,
+   "held_out_MLE_mm": 1.2368
+  },
+  {
+   "outer_fold": 4,
+   "n_fit_ears": 272,
+   "n_eval_ears": 68,
+   "ear_overlap": 0,
+   "subject_overlap": 0,
+   "in_fit_MLE_mm": 1.2816,
+   "held_out_MLE_mm": 1.2775
+  }
+ ],
+ "results": {
+  "per_model_pooled_OOF_mm": {
+   "base#s0": 1.3204,
+   "base#s1": 1.3086
+  },
+  "equal_weight_MLE_mm": 1.2822,
+  "nested_fitted_MLE_mm": 1.2841,
+  "LEAKY_in_sample_MLE_mm": 1.2807,
+  "optimism_mm": 0.0034,
+  "per_contour_MLE_mm": {
+   "equal_weight": {
+    "outer_helix": 1.3019,
+    "concha": 1.0439,
+    "inner_helix": 1.5661,
+    "sup._antihelix": 1.3796
+   },
+   "nested": {
+    "outer_helix": 1.303,
+    "concha": 1.0439,
+    "inner_helix": 1.5678,
+    "sup._antihelix": 1.3896
+   }
+  },
+  "directional_rmse_mm": {
+   "base#s0": {
+    "tangent_t": 1.4456,
+    "across_b": 0.7233,
+    "normal_n": 0.2822
+   },
+   "base#s1": {
+    "tangent_t": 1.4279,
+    "across_b": 0.7208,
+    "normal_n": 0.286
+   },
+   "equal_weight": {
+    "tangent_t": 1.409,
+    "across_b": 0.7037,
+    "normal_n": 0.2724
+   },
+   "nested_ensemble": {
+    "tangent_t": 1.411,
+    "across_b": 0.7047,
+    "normal_n": 0.2721
+   }
+  }
+ },
+ "comparisons": {
+  "nested_vs_best_single": {
+   "delta_mm": -0.0245,
+   "ci95": [
+    -0.0325,
+    -0.0164
+   ],
+   "p_negative": 1.0,
+   "verdict": "ADOPT"
+  },
+  "nested_vs_equal_weight": {
+   "delta_mm": 0.0019,
+   "ci95": [
+    -0.0006,
+    0.0044
+   ],
+   "p_negative": 0.0685,
+   "verdict": "INDISTINGUISHABLE"
+  },
+  "equal_weight_vs_best_single": {
+   "delta_mm": -0.0264,
+   "ci95": [
+    -0.0357,
+    -0.0171
+   ],
+   "p_negative": 1.0,
+   "verdict": "ADOPT"
+  }
+ },
+ "n_bootstrap": 20000,
+ "caveats": [
+  "STACKING, NOT FULL NESTING: the weights for outer fold k are fitted only on other folds' ears (asserted), but those ears' OOF predictions come from base models whose training folds include fold k. Full rigour needs the base models retrained inside each outer fold. The residual optimism from that is NOT quantified here; optimism_mm quantifies only the in-sample weight fit.",
+  "LEAKY_in_sample_MLE_mm is reported to size the optimism and is not a result.",
+  "Plain NNLS has no intercept and the coordinates are WORLD, so a non-simplex solution is not frame-invariant; sum(w) per contour is reported. SIMPLEX=1 removes this.",
+  "A weighted average of landmarks is off-surface and does not change correspondence: it cancels only the INDEPENDENT part of the members' along-contour phase error. Check tangent_t, not the total.",
+  "PRED=raw: raw-network OOF, NOT comparable to the shipped 1.273 / 1.3144 mm full-pipeline numbers (no surface projection, no dense-SSM blend)."
+ ]
+}

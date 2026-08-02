@@ -24,21 +24,35 @@ printed side by side here, and `2*meanNN` is checked against sqrt(A/N).
 WHAT IT MEASURED (8 ears per file, sample 0, area-weighted surface clouds from
 build_hires_data.py; reproduce with MODE=geom / MODE=pool / MODE=mem):
 
-    N       spacing   n(2.5)  n(5)   n(10)   n(20)   max n(2.5)  KMAX  head window
-    8192    1.0965     17.6    75.2   368.2  1676.1      36        46   4.29mm k=48
-    16384   0.7739     34.1   149.1   734.9  3355.3      66        92   4.28mm k=96
-    32768   0.5471     68.5   298.3  1470.0  6712.4     130       184   4.29mm k=192
+    N       spacing   n(2.5)  n(5)   n(10)   n(20)   head window   snap-jitter  file
+    8192    1.0965     17.6    75.2   368.2  1676.1   4.29mm k=48    0.389mm     248MB
+    16384   0.7739     34.1   149.1   734.9  3355.3   4.28mm k=96    0.274mm     244MB
+    32768   0.5468     67.2   297.3  1466.8  6711.0   4.27mm k=192   0.195mm     487MB
 
 INDEX COUNTS SCALE AS N, NOT AS sqrt(N). The fitted exponent of n(r) against N over
-8192->32768 is 0.99-1.00 for r >= 5mm and 0.98 at 2.5mm. This is the whole reason the
+8192->32768 is 0.99-1.00 for r >= 5mm and 0.97 at 2.5mm. This is the whole reason the
 earlier 8192 test was undecidable: doubling K for a 4x point increase (which is what
-"index counts scale as N^(1/2)" would prescribe, and what run_famA_probe.sh's header
-says) still halves the physical window. Holding the 4.29mm head window from 8192 to
-32768 needs k = 48 -> 192.
+"index counts scale as N^(1/2)" prescribes, and what run_famA_probe.sh's header says)
+still halves the physical window. Holding the 4.29mm head window from 8192 to 32768 needs
+k = 48 -> 192, and the measured window then lands at 4.29 / 4.28 / 4.27 mm.
 
-The ball CAPS are safe at every arm: kpconv's auto KMAX = ceil(2.8*pi*(R0/V0)^2) follows
-V0, and the measured largest 2.5mm ball stays at 0.71-0.78 of it, so frac_truncated is
-0.000 at every level (verified on a pinna-scale synthetic sheet at all three arms).
+THE AUTO BALL CAP IS NOT SAFE, AND ITS FAILURE GROWS WITH N -- the one thing in this
+whole exercise that would have quietly biased the sweep AGAINST resolution. fam_kpconv
+derives KMAX = ceil(2.8*pi*(R0/V0)^2) = 46 / 92 / 184 from the level-0 occupancy, on the
+argument that r_l/v_l is constant so all levels match. Run its OWN ladder on 40 real ears
+(MODE=ladder) and the deep levels are 2-3x denser than that design:
+
+    N       worst ball by level (train density)      worst overall   auto KMAX
+    8192    L0 35  L1 52  L2 54  L3 51                    54            46   TRUNCATES
+    16384   L0 64  L1 111 L2 127 L3 110                  127            92   TRUNCATES
+    32768   L0 106 L1 217 L2 252 L3 236                  252           184   TRUNCATES
+
+So the SHIPPED 8192 config truncates 2.6% of its 10mm balls and 8.0% of its 20mm balls,
+and at 16384 that becomes 9.3% / 12.1%. Set CFG_KMAX = 96 / 192 / 384 (still exactly ~N,
+anchored on the measured worst ball x 1.235 for a -10% aug_scale x 1.05 for unsampled
+ears) and the audit prints frac_truncated 0.000 at every level of every arm -- verified
+on real ears at all three. It costs ~2.1x kpconv memory and step time, paid equally by
+all three arms.
 
 FP16 STORAGE IS FREE, MEASURED. Round-tripping the real fp32 8192 clouds through fp16
 displaces a point by 5.1um mean / 21.9um max -- 0.5% of the 1.09mm spacing and 1.9% of
@@ -63,20 +77,23 @@ fallback (so ptv3's CPU peak OVERSTATES the GPU when no attention mask is needed
 the caching allocator fragments where CPU frees eagerly. Run this file with MODE=mem on
 the box before launching a sweep -- that is the only measured answer.
 
-CPU-PROXY peak of ONE TRAINING forward+backward, per ear (B=1, sub_frac=0.625), at the
-rescaled configs:
+CPU-PROXY peak of ONE TRAINING forward+backward at B=1, sub_frac=0.625, with the FINAL
+rescaled configs (CFG_KMAX 96/192/384), and the CPU time of the same call at B=2:
 
-    N        kpconv     ptv3      kpconv x16    ptv3 x16
-    8192     0.34 GiB   0.28 GiB    5.4 GiB      4.5 GiB
-    16384    0.79 GiB   0.42 GiB   12.6 GiB      6.7 GiB
-    32768    2.35 GiB   0.74 GiB   37.6 GiB     11.8 GiB
+    N        kpconv GiB  fwd+bwd  x8192      ptv3 GiB  fwd+bwd  x8192
+    8192       0.45       4.8 s    1.0        0.32      4.0 s    1.0
+    16384      1.30      17.7 s    3.7        0.41      4.9 s    1.2
+    32768      3.4-4.6   79.9 s   16.6        0.78      8.4 s    2.1
 
-KPConv grows as ~N^2 -- N points each holding pi*r^2*N/A neighbours, and every KPConv
-saves a (B, n, KMAX, cm) gather AND a (B, n, KMAX, NKP) kernel correlation for backward.
-37.6 GiB plus 1.1 GiB of resident cloud data on a 48 GB A6000 is too close to the edge,
-so the 32768 kpconv arm must micro-batch: ACCUM=2 (micro-batch 8) puts it near 19 GiB and
-is gradient-EXACT (smoke test 4/4). ptv3 grows LINEARLY because its stage-0 attention
-stays on the memory-efficient SDPA path, and fits B=16 everywhere.
+KPConv is QUADRATIC in N: it holds N points each with pi*r^2*N/A neighbours, and every
+KPConv saves a (B, n, KMAX, cm) gather AND a (B, n, KMAX, NKP) kernel correlation for
+backward. At B=16 that is ~7 / ~19 / ~60 GiB, so 32768 does NOT fit on a 48 GB A6000
+alongside 1.1 GiB of resident cloud data; ACCUM=4 (micro-batch 4) brings it to ~18 GiB
+and is gradient- AND randomness-EXACT (smoke test 4/4). ptv3 grows LINEARLY -- its
+stage-0 attention stays on the memory-efficient SDPA path and its pooling grid is pinned
+in millimetres -- and fits B=16 everywhere. The 32768 kpconv figure is the shakiest here:
+three repeated probes gave 3.40 / 4.60 / 5.16 GiB, so the CPU RSS proxy carries ~+-30%
+spread at that size. MODE=mem on the box replaces it with the CUDA allocator peak.
 
 ENVIRONMENT
   MODE      smoke   geom | pool | mem | smoke
@@ -587,16 +604,17 @@ if __name__ == "__main__":
         geom(os.environ.get("FILES", "scratch/screen_data_8192nrm.npz").split(","))
     elif MODE == "cfgcheck":
         # the exact per-arm blocks run_res_sweep.sh emits; keep the two in step
-        ARM = {8192:  dict(v0=1.096, hk=48,  ch=1024, patch=256,  poolr=2),
-               16384: dict(v0=0.774, hk=96,  ch=512,  patch=512,  poolr=4),
-               32768: dict(v0=0.547, hk=192, ch=256,  patch=1024, poolr=8)}
+        ARM = {8192:  dict(v0=1.096, hk=48,  km=96,  ch=1024, patch=256,  poolr=2),
+               16384: dict(v0=0.774, hk=96,  km=192, ch=512,  patch=512,  poolr=4),
+               32768: dict(v0=0.547, hk=192, km=384, ch=256,  patch=1024, poolr=8)}
         for n in [int(x) for x in os.environ.get("NS", "8192,16384,32768").split(",")]:
             a, dp = ARM[n], f"scratch/screen_data_{n}nrm.npz"
             if not os.path.exists(dp):
                 print(f"  {n}: {dp} ABSENT -- skipped"); continue
             cfgcheck("kpconv", n, dp, dict(
                 USE_NRM=1, NPTS=n, CFG_NPTS=n, CFG_V0=a["v0"], CFG_R0=2.5,
-                CFG_HEAD_K=a["hk"], CFG_NB_CHUNK=a["ch"], CFG_NB_STATS=0))
+                CFG_HEAD_K=a["hk"], CFG_KMAX=a["km"], CFG_NB_CHUNK=a["ch"],
+                CFG_NB_STATS=1))
             cfgcheck("ptv3", n, dp, dict(
                 USE_NRM=1, NPTS=n, CFG_NPTS=n, CFG_PATCH=a["patch"], CFG_K=a["hk"],
                 CFG_POOLR=a["poolr"], CFG_VOXEL=0.85, CFG_VOXGROW=2.5))

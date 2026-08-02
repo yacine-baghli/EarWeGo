@@ -21,9 +21,9 @@
 #     N       spacing   n(2.5mm)  n(5mm)  n(10mm)  n(20mm)   head window   snap-jitter
 #     8192    1.0965      17.6      75.2    368.2   1676.1   4.29mm k=48    0.389mm
 #     16384   0.7739      34.1     149.1    734.9   3355.3   4.28mm k=96    0.274mm
-#     32768   0.5471      68.5     298.3   1470.0   6712.4   4.29mm k=192   0.194mm
+#     32768   0.5468      67.2     297.3   1466.8   6711.0   4.27mm k=192   0.195mm
 #
-# The fitted exponent of n(r) against N is 0.99-1.00 for r >= 5mm and 0.95-0.98 at 2.5mm.
+# The fitted exponent of n(r) against N is 0.99-1.00 for r >= 5mm and 0.97 at 2.5mm.
 # It is NOT 0.5. The k column is what holds the head window at 4.29mm, and it lands within
 # 0.01mm at every arm. "snap-jitter" is the per-sample sd of the k-NN centroid the
 # offset/snap head returns, across the 4 fresh surface samples: resolution buys a 2x
@@ -87,13 +87,14 @@
 #              count of the 2.125mm and 5.31mm grids at BOTH the training density
 #              (sub_frac*N) and the evaluation density (N) -- i.e. so the GRID does the
 #              coarsening rather than the uniform along-curve merge. Occupancy is a
-#              property of the EAR and grows only 2434 -> 2679 -> ~2800 cells at 2.125mm
+#              property of the EAR and grows only 2434 -> 2679 -> 2837 cells at 2.125mm
 #              over a 4x point increase, so this ratio ladder lands the three arms on
 #              IDENTICAL budgets: eval slots [N, 4096, 2048/1024/1024], train slots
 #              [.625N, 2560/2560/3072, 1280/1024/1024]. The pooled stages are then
 #              physically the same across arms and only stage 0 changes -- which is
 #              exactly the variable under test.
-#              MEASURED worst-ear utilisation of the stage-1 budget: 0.89 / 1.05 / ~0.91.
+#              MEASURED worst-ear utilisation of the stage-1 budget: 0.89 / 1.05 / 0.96
+#              training, 0.63 / 0.70 / 0.75 evaluating.
 #              The 16384 arm is 5% over on its worst ear, so ~5% of that ear's coarse
 #              voxels get merged with a curve-neighbour. Taken deliberately: the strictly
 #              largest admissible value there is POOLR=3, but that would give it 3584
@@ -112,13 +113,22 @@
 # not the control. Expect the re-run 8192 numbers to differ from them, in either
 # direction, and do not read that difference as a resolution effect.
 #
-# EFFECTIVE BATCH IS HELD AT 16 EVERYWHERE. KPConv's neighbour tensors scale as N^2 (N
-# points x pi*r^2*N/A neighbours each), and a CPU-proxy probe of one training
-# forward+backward measures 0.34 / 0.79 / 2.35 GiB PER EAR at 8192 / 16384 / 32768. Times
-# 16 that is 5 / 13 / 38 GiB, and 38 GiB plus 1.1 GiB of resident cloud data on a 48 GB
-# card is too close to the edge, so the 32768 kpconv arm runs micro-batches of 8 with
-# ACCUM=2 (~19 GiB). ptv3 scales LINEARLY instead -- 0.28 / 0.42 / 0.74 GiB per ear, so
-# 12 GiB at B=16 even at 32768 -- because its stage-0 attention stays on the flash path.
+# EFFECTIVE BATCH IS HELD AT 16 EVERYWHERE. KPConv's neighbour tensors scale as N*KMAX,
+# and both are proportional to N, so its cost is QUADRATIC. CPU-proxy peak of one training
+# forward+backward at B=1, and the CPU time of that same call at B=2:
+#
+#              kpconv                        ptv3
+#     N        GiB/ear   fwd+bwd  x8192      GiB/ear  fwd+bwd  x8192
+#     8192      0.45      4.8 s    1.0        0.32     4.0 s    1.0
+#     16384     1.30     17.7 s    3.7        0.41     4.9 s    1.2
+#     32768     3.4-4.6  79.9 s   16.6        0.78     8.4 s    2.1
+#
+# So kpconv at B=16 needs ~7 / ~19 / ~60 GiB and does NOT fit at 32768 on a 48 GB card
+# alongside 1.1 GiB of resident cloud data; ACCUM=4 (micro-batch 4) brings it to ~18 GiB.
+# ptv3 stays LINEAR -- 12 GiB at B=16 even at 32768 -- because its stage-0 attention stays
+# on the memory-efficient SDPA path and its pooled stages are pinned in millimetres.
+# The 32768 kpconv row is the least trustworthy number here: three repeated probes gave
+# 3.40, 4.60 and 5.16 GiB, i.e. the CPU RSS proxy has ~+-30% spread at that size.
 # Every family here is LayerNorm-only, and train_family builds and AUGMENTS the whole
 # batch and slices only the forward, so ACCUM changes neither the gradient nor the random
 # stream: res_sweep_prep.py's smoke checks the gradient entry-wise (4.3e-07 relative),
@@ -138,15 +148,19 @@
 # arms. Change sub_frac, or set patch to anything other than N/32, and re-check.
 #
 # COST. Nobody in this repo has recorded a GPU wall clock for a 1200-epoch famA run, so
-# the absolute cost of this sweep is NOT known in advance and is not guessed here.
+# the ABSOLUTE cost of this sweep is not known in advance and is not guessed here.
 # PREFLIGHT 2 measures it with a 12-epoch probe (1% of a run) and prints a projection for
 # each of the six cells BEFORE any of them starts, so the decision to spend is taken on a
-# measurement. What IS known is the shape: kpconv's cost per step grows roughly as N^2
-# (neighbour gathers), ptv3's stage-0 attention also as N^2 in FLOPs (n*patch) though its
-# memory only as N, so expect the 32768 cells to dominate the bill by an order of
-# magnitude. If the projection is unaffordable, DROP THE 16384 ARM rather than shortening
-# the runs: 8192-vs-32768 is the largest contrast and EPOCHS must stay equal across arms
-# or the comparison is between two schedules, not two resolutions.
+# measurement. The RELATIVE cost is measured (table above): on CPU, one kpconv step costs
+# 1.0 / 3.7 / 16.6 units across the arms and one ptv3 step 1.0 / 1.2 / 2.1, and the KMAX
+# correction adds ~2.1x to every kpconv arm on top of that. Expect kpconv-32768 to be the
+# single dominant line item, plausibly 15-35x the kpconv-8192 arm once GPU parallelism
+# compresses the ratio somewhat -- but that compression is a guess and the probe is not.
+# If the projection is unaffordable, DROP THE 16384 ARM rather than shortening the runs:
+# 8192-vs-32768 is the largest contrast, and EPOCHS must stay equal across arms or the
+# comparison is between two schedules rather than two resolutions. Dropping kpconv-32768
+# and keeping ptv3-32768 is the other cheap option, and ptv3 is arguably the better probe
+# of resolution anyway because its pooled stages are pinned in millimetres.
 #
 #   bash run_res_sweep.sh                    # preflight, then all 6 runs
 #   PREFLIGHT_ONLY=1 bash run_res_sweep.sh   # memory + timing probes only -- DO THIS FIRST

@@ -1,0 +1,195 @@
+{
+ "members": [
+  "dgcnn3",
+  "kpconv",
+  "ptv3"
+ ],
+ "n_ears": 340,
+ "profile_contours": [
+  "inner_helix",
+  "sup._antihelix"
+ ],
+ "caveat": "post-hoc operator on predictions trained WITHOUT it; indicative of the premise, not of the family's score. No surface projection is applied, so the baseline row is above the shipped 1.1897mm.",
+ "rows": [
+  {
+   "name": "baseline (equal-weight ensemble, no projection)",
+   "leaky": false,
+   "all85_mm": 1.1952,
+   "profile_landmarks_mm": 1.3923,
+   "per_contour_mm": {
+    "outer_helix": 1.2686,
+    "concha": 0.937,
+    "inner_helix": 1.4859,
+    "sup._antihelix": 1.2051
+   },
+   "delta_all85_mm": -0.0
+  },
+  {
+   "name": "fold-mean profile, own endpoints",
+   "leaky": false,
+   "all85_mm": 1.2009,
+   "profile_landmarks_mm": 1.4086,
+   "per_contour_mm": {
+    "outer_helix": 1.2686,
+    "concha": 0.937,
+    "inner_helix": 1.5159,
+    "sup._antihelix": 1.1939
+   },
+   "delta_all85_mm": 0.0057
+  },
+  {
+   "name": "uniform profile, own endpoints",
+   "leaky": false,
+   "all85_mm": 1.2007,
+   "profile_landmarks_mm": 1.4079,
+   "per_contour_mm": {
+    "outer_helix": 1.2686,
+    "concha": 0.937,
+    "inner_helix": 1.5152,
+    "sup._antihelix": 1.1933
+   },
+   "delta_all85_mm": 0.0055
+  },
+  {
+   "name": "fold-mean profile on ALL FOUR contours",
+   "leaky": false,
+   "all85_mm": 1.4272,
+   "profile_landmarks_mm": 1.4086,
+   "per_contour_mm": {
+    "outer_helix": 1.6492,
+    "concha": 1.2607,
+    "inner_helix": 1.5159,
+    "sup._antihelix": 1.1939
+   },
+   "delta_all85_mm": 0.232
+  },
+  {
+   "name": "GT endpoint landmarks only, interior untouched",
+   "leaky": true,
+   "all85_mm": 1.1206,
+   "profile_landmarks_mm": 1.1809,
+   "per_contour_mm": {
+    "outer_helix": 1.2686,
+    "concha": 0.937,
+    "inner_helix": 1.3043,
+    "sup._antihelix": 0.9342
+   },
+   "delta_all85_mm": -0.0746
+  },
+  {
+   "name": "GT endpoints, predicted phase (reposition only)",
+   "leaky": true,
+   "all85_mm": 1.0133,
+   "profile_landmarks_mm": 0.8769,
+   "per_contour_mm": {
+    "outer_helix": 1.2686,
+    "concha": 0.937,
+    "inner_helix": 1.1293,
+    "sup._antihelix": 0.3722
+   },
+   "delta_all85_mm": -0.1819
+  },
+  {
+   "name": "GT endpoints + fold-mean profile",
+   "leaky": true,
+   "all85_mm": 0.9955,
+   "profile_landmarks_mm": 0.8266,
+   "per_contour_mm": {
+    "outer_helix": 1.2686,
+    "concha": 0.937,
+    "inner_helix": 1.073,
+    "sup._antihelix": 0.3337
+   },
+   "delta_all85_mm": -0.1997
+  },
+  {
+   "name": "GT endpoints + uniform profile",
+   "leaky": true,
+   "all85_mm": 0.9954,
+   "profile_landmarks_mm": 0.8262,
+   "per_contour_mm": {
+    "outer_helix": 1.2686,
+    "concha": 0.937,
+    "inner_helix": 1.0724,
+    "sup._antihelix": 0.3336
+   },
+   "delta_all85_mm": -0.1998
+  }
+ ],
+ "fold_profile_vs_baseline": {
+  "delta_mm": 0.0057,
+  "ci95": [
+   0.0005,
+   0.011
+  ],
+  "p_negative": 0.0157
+ },
+ "endpoint_sensitivity": {
+  "ensemble_endpoint_error_mm": 1.5851,
+  "baseline_30_landmarks_mm": 1.3923,
+  "break_even_mean_endpoint_error_mm": 1.005,
+  "required_improvement_factor": 1.58,
+  "leaky": true,
+  "noise_sweep": [
+   {
+    "sigma_mm": 0.0,
+    "mean_endpoint_error_mm": 0.0,
+    "reposition_only_mm": 0.8769,
+    "plus_profile_mm": 0.8266,
+    "profile_gain_mm": -0.0504
+   },
+   {
+    "sigma_mm": 0.25,
+    "mean_endpoint_error_mm": 0.3951,
+    "reposition_only_mm": 1.0066,
+    "plus_profile_mm": 0.964,
+    "profile_gain_mm": -0.0426
+   },
+   {
+    "sigma_mm": 0.5,
+    "mean_endpoint_error_mm": 0.7903,
+    "reposition_only_mm": 1.2404,
+    "plus_profile_mm": 1.2058,
+    "profile_gain_mm": -0.0346
+   },
+   {
+    "sigma_mm": 0.625,
+    "mean_endpoint_error_mm": 0.9878,
+    "reposition_only_mm": 1.3792,
+    "plus_profile_mm": 1.3478,
+    "profile_gain_mm": -0.0314
+   },
+   {
+    "sigma_mm": 0.75,
+    "mean_endpoint_error_mm": 1.1854,
+    "reposition_only_mm": 1.5279,
+    "plus_profile_mm": 1.4993,
+    "profile_gain_mm": -0.0286
+   },
+   {
+    "sigma_mm": 1.0,
+    "mean_endpoint_error_mm": 1.5805,
+    "reposition_only_mm": 1.8462,
+    "plus_profile_mm": 1.8221,
+    "profile_gain_mm": -0.0241
+   },
+   {
+    "sigma_mm": 1.5,
+    "mean_endpoint_error_mm": 2.3708,
+    "reposition_only_mm": 2.5331,
+    "plus_profile_mm": 2.5149,
+    "profile_gain_mm": -0.0182
+   },
+   {
+    "sigma_mm": 2.0,
+    "mean_endpoint_error_mm": 3.161,
+    "reposition_only_mm": 3.2538,
+    "plus_profile_mm": 3.2391,
+    "profile_gain_mm": -0.0147
+   }
+  ],
+  "units": "sigma_mm is the PER-AXIS Gaussian sd; every other mm here is a MEAN EUCLIDEAN NORM, and E||N(0,sigma^2 I_3)|| = 1.5958*sigma. The break-even is taken on mean_endpoint_error_mm so that it is comparable with ensemble_endpoint_error_mm; comparing sigma with it directly overstates the bar by 1.6x.",
+  "note": "isotropic Gaussian noise added to the GT endpoints, 3 draws averaged; 'reposition only' keeps the ensemble's own phase, '+ fold profile' replaces it. The noise is INDEPENDENT of the curve's own error, which is the right model for an external endpoint predictor but pessimistic for one that shares the backbone: the ensemble's own endpoints are off by 1.59 mm yet repositioning onto them is the identity, because that error is the curve's error."
+ },
+ "conclusion": "On the curves this ensemble already draws, imposing the fold-mean profile with the model's OWN endpoints moves the 30 profile landmarks +0.0163 mm and the pooled 85 by +0.0057 mm. With GT endpoints (LEAKY) the same placement reaches inner_helix 1.4859 -> 1.0730, sup._antihelix 1.2051 -> 0.3337. Forcing the profile on all four contours costs +0.2320 mm, which is why PROFILE_CONTOURS defaults to the two contours whose profile is measurably constant."
+}

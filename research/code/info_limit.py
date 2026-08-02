@@ -157,6 +157,8 @@ ENV (defaults in brackets)
   OUT [research/results/info_limit.json]
   REF_CACHE [scratch/_info_limit_refs.npz]  pass-1 reference descriptors, reused when the
                      descriptor configuration signature matches (pass 1 costs ~10 min)
+  RAW [scratch/_info_limit_raw.npz]  every per-(ear, landmark) statistic, dumped so the
+                     table and the correlations can be regenerated without rescanning
   SEED [777]  MMAX [4]  REG [1e-6]
   SMOKE [0]          1 = synthetic self-test, no dataset needed
 
@@ -200,6 +202,7 @@ ROT_INV = int(os.environ.get("ROT_INV", "0"))
 PRED = os.environ.get("PRED", "scratch/ensemble5_proj.npy")
 OUT = os.environ.get("OUT", "research/results/info_limit.json")
 REF_CACHE = os.environ.get("REF_CACHE", "scratch/_info_limit_refs.npz")
+RAW = os.environ.get("RAW", "scratch/_info_limit_raw.npz")
 SEED = int(os.environ.get("SEED", "777"))
 MMAX = int(os.environ.get("MMAX", "4"))
 SPACE_DIV = float(os.environ.get("SPACE_DIV", "5.0"))
@@ -532,6 +535,38 @@ def scan_landmark(e, g, gn, tc, pr, C0, CN0, DC0, Ref, RefF, Dg, mu, sd, res, Pa
         res["crest_off"] = pos[j]
 
 
+def model_directional(GTP, GTN, PR, scan):
+    """the FROZEN model's own error split on exactly the frame section (2) uses.
+
+    Without this the matcher numbers are not comparable to anything: the repo's published
+    1.40/0.70 directional RMSE is measured from a different frame (contour tangent from
+    the PREDICTED polyline) and against the raw annotation rather than its surface
+    projection.  This recomputes the model error in the same frame, on the same ears, so
+    "local geometry gives X, the model already gives Y" is a like-for-like statement.
+    """
+    out = {}
+    for nm in ("along", "across", "normal"):
+        out[nm] = []
+    for i in scan:
+        Tc = contour_tangent(GTP[i]); gn = GTN[i]
+        tt = Tc - gn * (Tc * gn).sum(1, keepdims=True)
+        tt /= np.maximum(np.linalg.norm(tt, axis=1, keepdims=True), 1e-12)
+        d = PR[i] - GTP[i]
+        out["along"].append(np.abs((d * tt).sum(1)))
+        out["across"].append(np.abs((d * np.cross(gn, tt)).sum(1)))
+        out["normal"].append(np.abs((d * gn).sum(1)))
+    res = {}
+    for nm, a in out.items():
+        a = np.asarray(a)
+        res[nm] = dict(mean=round(float(a.mean()), 4), median=round(float(np.median(a)), 4),
+                       rmse=round(float(np.sqrt((a ** 2).mean())), 4))
+        print(f"  frozen model |{nm}|: mean {a.mean():.4f}  median {np.median(a):.4f}  "
+              f"rmse {np.sqrt((a**2).mean()):.4f}")
+    res["euclidean_mean"] = round(float(np.linalg.norm(PR[scan] - GTP[scan], axis=2).mean()), 4)
+    print(f"  frozen model 3D mean on the scanned ears: {res['euclidean_mean']:.4f}mm")
+    return res
+
+
 # ------------------------------------------------------------------ the run
 def run():
     t00 = time.time()
@@ -633,11 +668,14 @@ def run():
         print(f"  scan {a+1}/{len(scan)} (ear {i})  {el:.0f}s  "
               f"eta {el/(a+1)*(len(scan)-a-1):.0f}s", flush=True)
 
-    report(O, sig, err_now, gtdist, h0, nsmp, trunc, scan, subj, NE, time.time() - t00)
+    print("\nTHE FROZEN MODEL IN THE SAME FRAME, ON THE SAME EARS")
+    mdir = model_directional(GTP, GTN, PR, scan)
+    report(O, sig, err_now, gtdist, h0, nsmp, trunc, scan, subj, NE, time.time() - t00,
+           mdir)
 
 
 # ------------------------------------------------------------------ reporting
-def report(O, sig, err_now, gtdist, h0, nsmp, trunc, scan, subj, NE, secs):
+def report(O, sig, err_now, gtdist, h0, nsmp, trunc, scan, subj, NE, secs, mdir=None):
     nmed = lambda a: np.nan if not np.isfinite(a).any() else float(np.nanmedian(a))
     med = {k: np.array([nmed(O[k][:, j]) for j in range(NL)]) for k in O}
     med["crest_ok"] = np.array([np.nan if not np.isfinite(O["crest_ok"][:, j]).any()
@@ -789,7 +827,7 @@ def report(O, sig, err_now, gtdist, h0, nsmp, trunc, scan, subj, NE, secs):
                           ridge0=med["ridge0"], crest_ok=med["crest_ok"],
                           crest_off=med["crest_off"], crest_off_sd=off_sd,
                           ncand=med["ncand"]).items()},
-        per_contour=rows, pooled=pool, correlations=C,
+        per_contour=rows, pooled=pool, correlations=C, frozen_model_directional=mdir,
         geometrically_determined=np.flatnonzero(det).tolist(),
         not_determined=np.flatnonzero(und).tolist(),
         caveats=[
