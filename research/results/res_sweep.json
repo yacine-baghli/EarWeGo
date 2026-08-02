@@ -6,14 +6,12 @@
  "nothing_was_trained": true,
  "arms": {
   "8192": {
-   "spacing_mm": 1.0965,
    "nb": {
     "2.5": 17.6,
     "5": 75.2,
     "10": 368.2,
     "20": 1676.1
    },
-   "head_window_mm": 4.29,
    "head_k": 48,
    "snap_jitter_mm": 0.3885,
    "occ_2p125": 2434,
@@ -38,7 +36,7 @@
    "kmax": 96,
    "poolr": 2,
    "patch": 256,
-   "v0": 1.096,
+   "v0": 1.067,
    "nb_chunk": 1024,
    "accum_kpconv": 1,
    "accum_ptv3": 1,
@@ -48,17 +46,21 @@
    "cpu_step_s_ptv3_B2": 4.0,
    "file": "scratch/screen_data_8192nrm.npz",
    "size_MB": 248.0,
-   "dtype": "float32"
+   "dtype": "float32",
+   "spacing_mm_8ears": 1.0965,
+   "spacing_mm_64ears": 1.0674,
+   "v0_8ears": 1.096,
+   "head_window_mm_8ears": 4.29,
+   "head_window_mm": 4.17,
+   "v0_source": "res_sweep_prep.py MODE=geom, 64 ears (was 8)"
   },
   "16384": {
-   "spacing_mm": 0.7739,
    "nb": {
     "2.5": 34.1,
     "5": 149.1,
     "10": 734.9,
     "20": 3355.3
    },
-   "head_window_mm": 4.28,
    "head_k": 96,
    "snap_jitter_mm": 0.2737,
    "occ_2p125": 2679,
@@ -83,27 +85,31 @@
    "kmax": 192,
    "poolr": 4,
    "patch": 512,
-   "v0": 0.774,
+   "v0": 0.754,
    "nb_chunk": 512,
    "accum_kpconv": 1,
    "accum_ptv3": 1,
-   "mem_kpconv_GiB_per_ear": 1.3,
+   "mem_kpconv_GiB_per_ear": 1.22,
    "mem_ptv3_GiB_per_ear": 0.41,
    "cpu_step_s_kpconv_B2": 17.7,
    "cpu_step_s_ptv3_B2": 4.9,
    "file": "scratch/screen_data_16384nrm.npz",
    "size_MB": 243.6,
-   "dtype": "float16"
+   "dtype": "float16",
+   "spacing_mm_8ears": 0.7739,
+   "spacing_mm_64ears": 0.7541,
+   "v0_8ears": 0.774,
+   "head_window_mm_8ears": 4.28,
+   "head_window_mm": 4.17,
+   "v0_source": "res_sweep_prep.py MODE=geom, 64 ears (was 8)"
   },
   "32768": {
-   "spacing_mm": 0.5468,
    "nb": {
     "2.5": 67.2,
     "5": 297.3,
     "10": 1466.8,
     "20": 6711.0
    },
-   "head_window_mm": 4.27,
    "head_k": 192,
    "snap_jitter_mm": 0.1946,
    "occ_2p125": 2837,
@@ -128,17 +134,23 @@
    "kmax": 384,
    "poolr": 8,
    "patch": 1024,
-   "v0": 0.547,
+   "v0": 0.533,
    "nb_chunk": 256,
    "accum_kpconv": 4,
    "accum_ptv3": 1,
-   "mem_kpconv_GiB_per_ear": "3.4-4.6",
+   "mem_kpconv_GiB_per_ear": 4.21,
    "mem_ptv3_GiB_per_ear": 0.78,
    "cpu_step_s_kpconv_B2": 79.9,
    "cpu_step_s_ptv3_B2": 8.4,
    "file": "scratch/screen_data_32768nrm.npz",
    "size_MB": 486.5,
-   "dtype": "float16"
+   "dtype": "float16",
+   "spacing_mm_8ears": 0.5468,
+   "spacing_mm_64ears": 0.5328,
+   "v0_8ears": 0.547,
+   "head_window_mm_8ears": 4.27,
+   "head_window_mm": 4.17,
+   "v0_source": "res_sweep_prep.py MODE=geom, 64 ears (was 8)"
   }
  },
  "scaling_law": {
@@ -181,7 +193,59 @@
    "same_3": 0.121
   },
   "fix": "CFG_KMAX = 96/192/384 (still ~N). Verified frac_truncated 0.000 at every level of every arm on real ears.",
-  "cost": "~2.1x kpconv memory and step time, paid equally by all three arms"
+  "cost": "~2.1x kpconv memory and step time, paid equally by all three arms",
+  "worst_ball_at_corrected_v0": {
+   "note": "40/40/20 ears, V0 = 1.067/0.754/0.533. Finer voxels than the 8-ear V0, so the deep levels are denser and the caps are tighter than first reported.",
+   "8192": {
+    "train": [
+     35,
+     52,
+     59,
+     55
+    ],
+    "eval": [
+     58,
+     58,
+     60,
+     55
+    ],
+    "cap": 96,
+    "margin_after_aug1.235_x1.05": 1.29
+   },
+   "16384": {
+    "train": [
+     64,
+     112,
+     133,
+     117
+    ],
+    "eval": [
+     99,
+     119,
+     140,
+     117
+    ],
+    "cap": 192,
+    "margin_after_aug1.235_x1.05": 1.06
+   },
+   "32768": {
+    "train": [
+     106,
+     224,
+     264,
+     252
+    ],
+    "eval": [
+     160,
+     259,
+     274,
+     256
+    ],
+    "cap": 384,
+    "margin_after_aug1.235_x1.05": 1.08
+   },
+   "audit": "frac_truncated 0.000 at every level of every arm, real ears, MODE=cfgcheck"
+  }
  },
  "ptv3_flash_path": {
   "claim": "stage-0 SDPA stays on the memory-efficient path only while n is an exact multiple of patch; otherwise Block.forward pads and materialises a (B*npat, heads, patch, patch) score matrix (~5.6 GiB per block at 32768/B=16)",
@@ -197,5 +261,33 @@
   "the 8192 arm must be RE-RUN under this convention. The shipped 1.2516/1.2417 used V0=1.0 against a 1.0965mm spacing, k=48 without asking what it meant in mm, POOLR=4 at 1.27x over the stage-1 slot budget, and an auto KMAX that truncated 8% of the 20mm balls. They are history, not the control.",
   "kpconv's voxel ladder is v0*2^l, so raising N refines every pooled level too, not only the input. Conv radii are held, so the receptive-field ladder is unchanged, but this sweep tests 'denser everywhere' for kpconv and 'denser at stage 0 only' for ptv3.",
   "snap-jitter is a geometric surrogate for fresh_sample_pred_variance_mm, not a measurement of the trained network."
- ]
+ ],
+ "verified_by": {
+  "who": "independent verifier, by re-execution on the real 340-ear files",
+  "reproduced_exactly": [
+   "MODE=geom at EARS=8: spacing/n(r)/head window/snap-jitter/fp16 all bit-for-bit as reported",
+   "scaling exponents 0.967/0.992/0.997/1.000 -- index counts scale as N, not sqrt(N)",
+   "shipped-8192 kpconv truncation 0.026/0.013/0.080 and 16384-auto 0.093/0.054/0.121",
+   "CFG_KMAX 96/192/384 gives frac_truncated 0.000 at every level of every arm (real ears)",
+   "MODE=pool occupancy and the POOLR 2/4/8 admissibility table, incl. 16384 being 1.05x over",
+   "ptv3 slot budgets eval [N,4096,2048/1024/1024] train [.625N,2560/2560/3072,1280/1024/1024]",
+   "ACCUM smoke 4.29e-07 / 3.47e-01 / delta 0.0e+00 mm",
+   "left/right reflection: dot(n,radial) +0.0194 left vs +0.0195 right at 8192 (and at 16k/32k); normal dot at nearest neighbour between a right ear and its own mirrored left ear +0.81. No inverted-normal bug.",
+   "coarse/true/R/c0/split bit-identical across all three arms; GT stays float32",
+   "crop centre is the COARSE prediction (build_hires_data.py:129 cw = coarse[i] @ R + cc)"
+  ],
+  "defects_found_and_fixed": [
+   "run_res_sweep.sh called python3 research/code/res_sweep_prep.py, but the box is FLAT (every other run_*.sh uses bare `python3 -u train_family.py`). BOTH preflight-1 probes would have died with 'can't open file' and the `|| echo FAILED (OOM?)` would have reported six phantom OOMs. Now resolved at startup with a hard failure if absent.",
+   "V0 was measured over EARS=8. Crop area is 8000..10418 mm^2 per ear, so 8 ears leave a 1.4% sem and that subset sits +2.68/+2.64/+2.66% high. 24 and 64 ears both give 1.067/0.754/0.533. Identical bias at every arm, so no comparison was threatened, but the mm labels were: the head window is 4.17mm, not 4.29mm. V0 corrected, geom now defaults to 64 ears and prints the sem, and the neighbour audit re-run at the corrected V0 still prints frac_truncated 0.000 everywhere (memory 0.45/1.22/4.21).",
+   "ACCUM is NOT run-identical once dropout is on, and FakeFamily has no Dropout so the shipped smoke could not see it. Measured: dropout=0.0 -> 4.29e-07 (exact), dropout=0.1 -> 2.96e-01, i.e. a different mask realisation. kpconv/ptv3 ship dropout=0.1 and kpconv-32768 is the only ACCUM>1 cell. Smoke 4/4 now asserts both rows; run_res_sweep.sh's claim corrected.",
+   "build_hires_data.py's winding assert compared vertex_normals(V,F) against itself in both branches -- identically 1.0, catching nothing. Replaced with the real reflection invariant n_right == MIRROR * n_left (passes on real meshes).",
+   "MODE=ladder defaulted to 12 ears while the docstring quoted 40, so the KMAX evidence was not reproducible from the shipped entry point. It now defaults to 40 and honours EARS. run_res_sweep.sh header said KMAX 80/160/320; it is 96/192/384."
+  ],
+  "still_open": [
+   "NO GPU was touched by the builder or the verifier. Every memory and timing number here is a CPU-RSS proxy. PREFLIGHT_ONLY=1 remains mandatory before committing the sweep.",
+   "V0/KMAX/POOLR are derived from ears spanning all 340, i.e. including fold-0 validation ears. They are GT-FREE (density and occupancy of the input clouds only), so no label leaks; measured sensitivity is nil -- train-fold-only ears give 2*meanNN 1.0788 vs 1.0671 for all 340, and worst ball 59 vs 63 against a cap of 96.",
+   "the KMAX audit at cfgcheck runs ONE ear per arm; the 40-ear ladder is the wider evidence.",
+   "kpconv-32768 carries an extra dropout-realisation nuisance from ACCUM=4 on top of the seed noise every cell has. Inside the stated >=0.08mm read-out threshold, but it is not a byte-identical run. CFG_DROPOUT=0 on all arms would remove it."
+  ]
+ }
 }

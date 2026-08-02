@@ -119,10 +119,17 @@ for slot, i in enumerate(IDX):
     if side == "right":                      # reflection: flip winding, recompute normals
         V, F = V0 * MIRROR, F0[:, [0, 2, 1]]
         VN = vertex_normals(V, F)
+        # The old check here compared VN against vertex_normals(V, F) -- which is how VN
+        # was just built, in BOTH branches, so it was identically 1.0 and caught nothing.
+        # The real invariant of a reflection is the one an inverted-normal bug breaks:
+        # for orthogonal M with det(M) = -1, the winding flip makes the recomputed normal
+        # equal M n, i.e. the MIRROR of the left-ear normal, not -M n. Assert THAT.
+        chk = float((VN * (VN0 * MIRROR)).sum(1).mean())
+        assert chk > 0.99, (f"{pid}/right: mirrored normals are not the mirror of the "
+                            f"left-ear normals (mean dot {chk:.3f}; ~-1 means the winding "
+                            f"flip and the reflection cancelled and every normal is inward)")
     else:
         V, F, VN = V0, F0, VN0
-    chk = float((VN * vertex_normals(V, F)).sum(1).mean())
-    assert chk > 0.99, f"{pid}/{side}: shipped normals disagree with winding ({chk:.3f})"
 
     R, cc = Rm[i].astype(np.float64), c0[i].astype(np.float64)
     cw = coarse[i] @ R + cc

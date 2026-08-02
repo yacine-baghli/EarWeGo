@@ -16,18 +16,31 @@ gridded) sample of a surface E[NN] = s/2, so a V0 set from a mean-NN measurement
 too small, which quadruples kpconv's auto KMAX and quarters its intended stride. Both are
 printed side by side here, and `2*meanNN` is checked against sqrt(A/N).
 
+AND IT NEEDS MORE THAN 8 EARS. A is a property of the EAR, ranging 8000..10418 mm^2
+(build_hires_data.py's own crop-area print, 60 ears), so s has a ~4% per-ear sd and 8
+ears leave a 1.4% standard error. The first pass of this file measured over EARS=8 and
+got 1.0965 / 0.7739 / 0.5468; 24 and 64 ears both give 1.067 / 0.754 / 0.533, and the
+triangulated crop area (median 9416 mm^2) independently gives 1.0715 at 8192. MODE=geom
+now defaults to 64 ears and prints the sem. The 8-ear error was +2.68 / +2.64 / +2.66%,
+i.e. the SAME at every arm, so it biased no comparison -- but every absolute millimetre
+below that was derived from it (head window, implied crop area) is ~2.7% high, and the
+head window is really 4.17mm, not 4.29mm.
+
     MODE=geom  FILES=scratch/screen_data_8192nrm.npz,... python research/code/res_sweep_prep.py
     MODE=pool  FILES=...8192nrm.npz,...32768nrm.npz PATCHES=256,1024 python ...
     MODE=mem   FAM=kpconv N=32768 B=2 python research/code/res_sweep_prep.py
     python research/code/res_sweep_prep.py          # <- CPU smoke test, <90s
 
 WHAT IT MEASURED (8 ears per file, sample 0, area-weighted surface clouds from
-build_hires_data.py; reproduce with MODE=geom / MODE=pool / MODE=mem):
+build_hires_data.py; reproduce with EARS=8 MODE=geom / MODE=pool / MODE=mem. The
+spacing and head-window columns are the 8-ear values and are ~2.7% high at every arm --
+see the paragraph above; the ball counts and the snap-jitter are not affected by that):
 
     N       spacing   n(2.5)  n(5)   n(10)   n(20)   head window   snap-jitter  file
     8192    1.0965     17.6    75.2   368.2  1676.1   4.29mm k=48    0.389mm     248MB
     16384   0.7739     34.1   149.1   734.9  3355.3   4.28mm k=96    0.274mm     244MB
     32768   0.5468     67.2   297.3  1466.8  6711.0   4.27mm k=192   0.195mm     487MB
+    64-ear spacing: 1.0674 / 0.7541 / 0.5328 mm  ->  head window 4.17mm, V0 as shipped
 
 INDEX COUNTS SCALE AS N, NOT AS sqrt(N). The fitted exponent of n(r) against N over
 8192->32768 is 0.99-1.00 for r >= 5mm and 0.97 at 2.5mm. This is the whole reason the
@@ -96,11 +109,13 @@ three repeated probes gave 3.40 / 4.60 / 5.16 GiB, so the CPU RSS proxy carries 
 spread at that size. MODE=mem on the box replaces it with the CUDA allocator peak.
 
 ENVIRONMENT
-  MODE      smoke   geom | pool | mem | smoke
+  MODE      smoke   geom | pool | ladder | mem | cfgcheck | smoke
+  EARS      8       ears sampled per file. MODE=geom defaults to 64 and MODE=ladder to 40
+                    when EARS is unset -- spacing needs the precision and the worst ball
+                    is an extreme-value statistic (8192 eval worst: 42 at 8 ears, 59 at 12)
   PATCHES   256     comma-separated ptv3 patch per FILES entry (MODE=pool)
   SNAPK     48      k for the snap-jitter surrogate; pass each arm its own rescaled k
   FILES     scratch/screen_data_8192nrm.npz      comma-separated npz list (MODE=geom)
-  EARS      8       ears sampled per file, evenly spread over the 340
   RADII     2.5,5,10,20   mm ball radii whose occupancy is reported
   VOXELS    0.425,0.55,0.6,0.85,1.09,1.5,2.125,3.0,4.25,5.31,8.5   mm, ptv3 grid ladder
   FAM       kpconv  kpconv | ptv3        (MODE=mem)
@@ -212,7 +227,7 @@ def kp_ladder(P, v0, r0, stages):
     return out
 
 
-def ladder(files, v0s, r0=2.5, stages=3, subfrac=0.625, nears=12):
+def ladder(files, v0s, r0=2.5, stages=3, subfrac=0.625, nears=None):
     """WHAT KMAX ACTUALLY HAS TO BE, measured on real ears at both densities.
 
     fam_kpconv derives KMAX = ceil(2.8*pi*(R0/V0)^2) on the argument that r_l/v_l is
@@ -225,14 +240,16 @@ def ladder(files, v0s, r0=2.5, stages=3, subfrac=0.625, nears=12):
     is not a clean resolution experiment. So: measure the worst ball per level, per arm,
     at the training AND the evaluation density, and set CFG_KMAX from that.
     """
-    for f, v0 in zip(files, v0s):
+    nears = NEARS if nears is None else nears     # EARS is the knob; the table in the
+    for f, v0 in zip(files, v0s):                 # docstring came from EARS=40/40/20
         if not os.path.exists(f):
             print(f"\n### {f}  ABSENT -- skipped"); continue
         z = np.load(f)
         C = z["clouds"]
         E, N = C.shape[0], C.shape[2]
         auto = max(16, int(math.ceil(2.8 * math.pi * (r0 / v0) ** 2)))
-        print(f"\n### {os.path.basename(f)}  N={N} V0={v0} R0={r0}  auto KMAX={auto}")
+        print(f"\n### {os.path.basename(f)}  N={N} V0={v0} R0={r0}  auto KMAX={auto}"
+              f"  ({min(nears, E)} ears)")
         rs = np.random.RandomState(0)
         for tag, n in (("train", int(round(N * subfrac))), ("eval", N)):
             worst = [0] * (stages + 1)
@@ -273,8 +290,10 @@ def snap_jitter(C, q, k=48):
     return float(np.linalg.norm(ctr - ctr.mean(0), axis=-1).mean()) / math.sqrt((M - 1) / M)
 
 
-def geom(files):
+def geom(files, nears=None):
     from scipy.spatial import cKDTree
+    global NEARS
+    NEARS = NEARS if nears is None else nears
     for f in files:
         if not os.path.exists(f):
             print(f"\n### {f}  ABSENT -- skipped"); continue
@@ -299,12 +318,23 @@ def geom(files):
             if M > 1:
                 jit.append(snap_jitter(C[e].astype(np.float64), Q[e].astype(np.float64),
                                        SNAPK))
+        # The crop area is an EAR property and it varies 8000..10418 mm^2, so the spacing
+        # has a per-ear sd of ~4%. At EARS=8 the standard error is still 1.4% and the
+        # linspace(0,339,8) subset happens to land 2.7% high: it gives 1.0965mm where 24
+        # and 64 ears both give 1.067mm, and build_hires_data's own triangulated crop area
+        # (median 9416 mm^2 over 60 ears) says 1.0715mm. That 2.7% is IDENTICAL at all
+        # three arms (+2.68/+2.64/+2.66%), so it never threatened the sweep -- the arms
+        # still hold the same window as each other to 0.04% -- but it is 2.7% off as an
+        # absolute millimetre. Report the spread so nobody quotes 4 decimals off 8 ears.
+        sd = float(np.std(nn)) * 2
         nn = float(np.mean(nn))
         area = N * (2 * nn) ** 2                      # E[NN] = s/2 for a random surface sample
         print(f"  mean-NN {nn:.4f}mm   2*meanNN {2*nn:.4f}mm   implied crop area "
               f"{area:.0f} mm^2   bbox extent {np.mean(ext, 0).round(1)}")
         print(f"  GRID-EQUIVALENT SPACING to use as kpconv V0: {2*nn:.4f} mm "
-              f"(sqrt(A/N) with A=9674 mm^2 -> {math.sqrt(9674/N):.4f} mm)")
+              f"+- {sd/math.sqrt(len(ears)):.4f} sem over {len(ears)} ears "
+              f"(per-ear sd {sd:.4f}; sqrt(A/N) with the measured A=9416 mm^2 -> "
+              f"{math.sqrt(9416/N):.4f} mm)")
         print(f"  fp16 round-trip displacement: mean {np.mean([a for a, _ in f16])*1000:.1f} um"
               f"   max {np.max([b for _, b in f16])*1000:.1f} um")
         if jit:
@@ -328,7 +358,7 @@ def geom(files):
 
 
 # ------------------------------------------------------------------ ptv3 pool budget
-def pool_budget(files, patches, cands=(2, 3, 4, 6, 8, 12, 16), subfrac=0.625, nears=8):
+def pool_budget(files, patches, cands=(2, 3, 4, 6, 8, 12, 16), subfrac=0.625, nears=None):
     """Pick ptv3's POOLR from MEASURED occupancy instead of from a guess.
 
     ptv3 coarsens by a GRID (voxel * voxgrow^s) but writes the result into a fixed
@@ -342,6 +372,7 @@ def pool_budget(files, patches, cands=(2, 3, 4, 6, 8, 12, 16), subfrac=0.625, ne
     costs only memory, so the choice is the LARGEST poolr that still covers both.
     """
     import fam_ptv3 as P3
+    nears = NEARS if nears is None else nears
     for f, patch in zip(files, patches):
         if not os.path.exists(f):
             print(f"\n### {f}  ABSENT -- skipped"); continue
@@ -570,6 +601,39 @@ def smoke():
           f"is not cosmetic")
     assert bad > 1e-3
 
+    # ...and the LIMIT of the exactness claim, measured rather than left implicit.
+    # FakeFamily has no Dropout, so the two checks above and the end-to-end run below are
+    # all blind to the one thing ACCUM really does perturb: dropout draws its mask per
+    # FORWARD, so 4 micro-batches draw 4 masks where 1 batch drew 1. kpconv and ptv3 both
+    # ship dropout=0.1, and kpconv-32768 is the only arm that runs ACCUM>1, so say the
+    # size of it out loud instead of discovering it later.
+    class _Drop(TF.FakeFamily):
+        def __init__(self, cfg, meta):
+            super().__init__(cfg, meta)
+            self.dp = torch.nn.Dropout(float(cfg["dropout"]))
+
+        def forward(self, b):
+            o = super().forward(b)
+            return {**o, "pred": self.dp(o["pred"])}
+
+    for p in (0.0, 0.1):
+        torch.manual_seed(1)
+        fd = _Drop({**TF.TRAIN_DEFAULTS, **TF.FakeFamily.DEFAULTS, "dropout": p}, meta)
+        fd.train()
+        torch.manual_seed(7); fd.zero_grad()
+        TF.default_loss(fd(bb), tg, fd, bb).backward()
+        rf = [q.grad.clone() for q in fd.parameters()]
+        torch.manual_seed(7); fd.zero_grad()
+        for a in range(0, 8, 3):
+            sl = {k: v[a:a + 3] for k, v in bb.items()}
+            (TF.default_loss(fd(sl), tg[a:a + 3], fd, sl) * (sl["ear"].shape[0] / 8)).backward()
+        e = max(float((x - q.grad).abs().max()) / max(float(x.abs().max()), 1e-12)
+                for x, q in zip(rf, fd.parameters()))
+        print(f"  with DROPOUT={p}: {e:.2e} -- "
+              + ("exact" if e < 1e-5 else "a DIFFERENT dropout realisation, not the same run"))
+        assert (e < 1e-5) == (p == 0.0), \
+            f"dropout={p} exactness changed; the ACCUM caveat in run_res_sweep.sh is stale"
+
     # ...and the same thing END TO END through main(), because gradient equality is not
     # enough: ACCUM must also not perturb the RANDOM STREAM. train_family builds and
     # augments the whole batch and slices only the forward, so ACCUM=4 must reproduce
@@ -601,12 +665,15 @@ def smoke():
 
 if __name__ == "__main__":
     if MODE == "geom":
-        geom(os.environ.get("FILES", "scratch/screen_data_8192nrm.npz").split(","))
+        # 8 ears leaves a 1.4% standard error on the one number the whole rescaling hangs
+        # on, and the linspace(0,339,8) subset is 2.7% high. Default to 64; EARS overrides.
+        geom(os.environ.get("FILES", "scratch/screen_data_8192nrm.npz").split(","),
+             nears=int(os.environ["EARS"]) if "EARS" in os.environ else 64)
     elif MODE == "cfgcheck":
         # the exact per-arm blocks run_res_sweep.sh emits; keep the two in step
-        ARM = {8192:  dict(v0=1.096, hk=48,  km=96,  ch=1024, patch=256,  poolr=2),
-               16384: dict(v0=0.774, hk=96,  km=192, ch=512,  patch=512,  poolr=4),
-               32768: dict(v0=0.547, hk=192, km=384, ch=256,  patch=1024, poolr=8)}
+        ARM = {8192:  dict(v0=1.067, hk=48,  km=96,  ch=1024, patch=256,  poolr=2),
+               16384: dict(v0=0.754, hk=96,  km=192, ch=512,  patch=512,  poolr=4),
+               32768: dict(v0=0.533, hk=192, km=384, ch=256,  patch=1024, poolr=8)}
         for n in [int(x) for x in os.environ.get("NS", "8192,16384,32768").split(",")]:
             a, dp = ARM[n], f"scratch/screen_data_{n}nrm.npz"
             if not os.path.exists(dp):
@@ -619,8 +686,13 @@ if __name__ == "__main__":
                 USE_NRM=1, NPTS=n, CFG_NPTS=n, CFG_PATCH=a["patch"], CFG_K=a["hk"],
                 CFG_POOLR=a["poolr"], CFG_VOXEL=0.85, CFG_VOXGROW=2.5))
     elif MODE == "ladder":
+        # KMAX is a SAFETY cap read off a WORST case, so the default sample here is 40
+        # ears rather than the 8 the other modes use: the worst ball is an extreme-value
+        # statistic and 8 ears underestimate it (measured 8192 eval worst: 59 at 12 ears,
+        # 42 at 8). EARS in the environment still overrides.
         fl = os.environ.get("FILES", "scratch/screen_data_8192nrm.npz").split(",")
-        ladder(fl, [float(x) for x in os.environ.get("V0S", "1.096").split(",")])
+        ladder(fl, [float(x) for x in os.environ.get("V0S", "1.096").split(",")],
+               nears=int(os.environ["EARS"]) if "EARS" in os.environ else 40)
     elif MODE == "pool":
         fl = os.environ.get("FILES", "scratch/screen_data_8192nrm.npz").split(",")
         pool_budget(fl, [int(x) for x in os.environ.get("PATCHES", "256").split(",")])

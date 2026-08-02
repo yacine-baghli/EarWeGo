@@ -2756,6 +2756,16 @@
   "refine_vs_frozen": {
    "frac_improved": 0.2895,
    "delta_mm": 0.3696
+  },
+  "crest_off_left": {
+   "mean": 0.0366,
+   "sd": 0.7605,
+   "n": 3237
+  },
+  "crest_off_right": {
+   "mean": 0.0564,
+   "sd": 0.7685,
+   "n": 3251
   }
  },
  "correlations": {
@@ -2900,6 +2910,24 @@
    ]
   }
  },
+ "frozen_model_directional": {
+  "along": {
+   "mean": 0.9642,
+   "median": 0.7049,
+   "rmse": 1.3376
+  },
+  "across": {
+   "mean": 0.4579,
+   "median": 0.3538,
+   "rmse": 0.6146
+  },
+  "normal": {
+   "mean": 0.102,
+   "median": 0.0516,
+   "rmse": 0.2007
+  },
+  "euclidean_mean": 1.1739
+ },
  "geometrically_determined": [
   67,
   68,
@@ -2951,5 +2979,5 @@
   "The DIRECTIONAL split of lambda is noise-contaminated in the uninformative direction and understates anisotropy badly (verified on the synthetic self-test). Use nn1_gt_along/across and the 1-D matchers for direction.",
   "The scan uses a subset of ears (N_SCAN); per-landmark entries are medians over that subset, so a single per-landmark value carries the sampling error of that many observations."
  ],
- "runtime_s": 473.9
+ "runtime_s": 594.8
 }

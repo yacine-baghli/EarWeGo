@@ -127,6 +127,15 @@ mutually consistent. The bound is scale-aware on purpose: at fitting scale r the
 sphere the fit can even represent has radius ~r/2, so |k| > 2/r is a numerical artefact,
 not a feature. The clipped fraction per radius is REPORTED, not hidden.
 
+S IS NOT IMMUNE TO THE CLIP, contrary to the obvious intuition. S depends only on the
+RATIO k1:k2, so clipping BOTH eigenvalues by the same factor leaves it alone -- but a
+ONE-SIDED clip changes the ratio and moves it. Measured on ear 0: at r=6mm, 18.7% of
+target vertices have exactly one of k1,k2 clipped (0.2% have both), and the resulting
+|dS| is 0.0067 mean / 0.123 p99 / 0.322 max, with 4.5% of vertices moved by more than
+0.05. At r=1.5mm it is negligible (1.2% one-sided, mean |dS| 0.0002). So S@6 carries a
+~1% -of-its-own-sd clipping bias concentrated on the sharpest features -- exactly the
+ridges. S@1.5 and S@3 do not.
+
 
 THE REFLECTION -- WHAT ACTUALLY FLIPS, AND WHAT DOES NOT
 ---------------------------------------------------------
@@ -233,6 +242,35 @@ WHAT IS NOT VERIFIED HERE
     ground-truth curvature on a real ear, so absolute accuracy is UNKNOWN.
   * nothing here has been trained. The probe (research/code/curv_probe.py) measures
     whether the channel is DISCRIMINATIVE, not whether a network can use it.
+  * the ZERO-FILL IS BIGGER THAN THE VERTEX COUNT SUGGESTS. 4.2% of target VERTICES are
+    under-determined at r=1.5mm (<6 neighbours) and get all four r=1.5 channels set to
+    0.0, i.e. "flat" -- a lie about a sparse region, not a missing value. But the sample
+    is AREA-weighted and sparse regions are exactly the ones with big triangles, so the
+    fraction of shipped SAMPLE POINTS whose whole r=1.5 block is exactly zero is
+    MEASURED at 11.1% (slot 0, all 340 ears), 2.6x the per-vertex rate. r=3.0 is 0.05%
+    and r=6.0 is 0%. This is the one place a model could learn a tessellation artefact,
+    and at r=1.5 it is a ninth of the input.
+
+THE PROBE SAYS REDUNDANT, NOT NULL -- read this before spending GPU on USE_CRV=1. In
+leave-one-subject-out nearest-template retrieval over all 340 ears, position alone scores
+3.6250mm and oriented normals take it to 2.8492. Curvature ALONE is a real descriptor:
+3.3639 (-0.2611), and at the same mixing weight its own shuffled control is 0.20mm worse
+than position alone, so the signal is not dimensionality. But it is REDUNDANT with the
+normals: nrm+crv is 2.8809, i.e. +0.0317mm against nrm under POS=mean and -0.0306mm under
+POS=coarse -- no stable effect either way. The one contour it consistently helps is the
+CONCHA (the r=6mm basin block); the one it consistently hurts is the inner helix.
+
+An EARLIER VERSION OF THIS PARAGRAPH SAID "NULL" and quoted +0.3126mm. That was an
+artefact of curv_probe.py's first weight grid, which started at w=0.25 -- past the optimum
+for a 12-column descriptor. Same file, same slot, same code, finer grid: crv 3.6250
+(0.0000) -> 3.3639 (-0.2611), and the nrm+crv penalty collapses from +0.3126 to +0.0317.
+The grid is fixed; the numbers above are the corrected ones. Full table and caveats in
+curv_probe.py's docstring and research/results/curv_probe.json.
+
+The data file is built and wired regardless: the probe's metric is unlearned, isotropic
+and per-landmark independent, and it cannot rule out a learned use. What it does say is
+that a 15-channel nrm+crv concat is the WRONG first experiment -- the case, if any, is the
+r=6mm block, or curvature INSTEAD of normals rather than on top of them.
 
 ENV (defaults in brackets)
   NPTS [8192] M [4]        must match screen_data_<NPTS>nrm.npz
@@ -591,10 +629,19 @@ def run():
         if side == "right":                    # reflection: flip winding, RECOMPUTE normals
             V, F = V0 * MIRROR, F0[:, [0, 2, 1]]
             VN = vertex_normals(V, F)
+            # The obvious check -- dot(VN, vertex_normals(V, F)) -- is identically 1.0 in
+            # BOTH branches, because VN *is* vertex_normals(V, F). build_hires_data.py
+            # already shipped that dead check once and documents replacing it. The real
+            # invariant of a reflection: for orthogonal M with det M = -1, the winding flip
+            # makes the recomputed normal equal M n, i.e. the MIRROR of the left normal --
+            # not -M n. Measured: +1.0 here, -1.0 if the winding flip is dropped.
+            chk = float((VN * (VN0 * MIRROR)).sum(1).mean())
+            assert chk > 0.99, (f"{pid}/right: mirrored normals are not the mirror of the "
+                                f"left-ear normals (mean dot {chk:.3f}; ~-1 means the "
+                                f"winding flip and the reflection cancelled and every "
+                                f"normal points inward -- H and S would flip, K would not)")
         else:
             V, F, VN = V0, F0, VN0
-        dot = float((VN * vertex_normals(V, F)).sum(1).mean())
-        assert dot > 0.99, f"{pid}/{side}: shipped normals disagree with winding ({dot:.3f})"
 
         R, cc = Rm[i].astype(np.float64), c0[i].astype(np.float64)
         c, cl, nr, feat, dg = build_ear(V, F, VN, R, cc, coarse[i].astype(np.float64), i)
@@ -620,7 +667,14 @@ def run():
         D["reach"].append(dg["khop"] * dg["med_edge"])
         D["k_corr"].append(dg["k_corr"]); D["n_tgt"].append(dg["n_tgt"])
         D["n_sup"].append(dg["n_sup"]); D["replay"].append(rep)
-        D["nrmdot"].append(float((nr * nrm0[ROW[int(i)]]).sum(-1).mean()))
+        # The replay assert above pins the POSITIONS. This pins the ORIENTATION against the
+        # already-validated hires file, and it is the guard that actually has teeth on real
+        # anatomy -- so it asserts rather than only printing.
+        nd = float((nr * nrm0[ROW[int(i)]]).sum(-1).mean())
+        assert nd > 0.99, (f"ear {i} ({pid}/{side}): replayed normals disagree with {SRC} "
+                           f"(mean dot {nd:.4f}). The tangent frame is wrong; H and S "
+                           f"would be sign-flipped and K would not -- refusing.")
+        D["nrmdot"].append(nd)
         D["meanS"].append(float(c[..., 0::4].mean())); D["side"].append(side)
         nclip += np.array(dg["nclip"]); nlow += np.array(dg["nlow"])
         nbr += np.array(dg["nbr"]); npts_tot += dg["n_tgt"]
@@ -831,8 +885,9 @@ def smoke():
                            b["coarse"] / 30.0], -1)
             return {"pred": b["coarse"] + self.head(x)}
 
-    net = CrvFamily()
-    g = torch.Generator(device=dev); g.manual_seed(0)
+    torch.manual_seed(0)      # the batch generator was seeded but the WEIGHTS were not, so
+    net = CrvFamily()         # the printed loss/grad-norm moved every run and could not be
+    g = torch.Generator(device=dev); g.manual_seed(0)   # compared against a previous one
     b0 = {"pc": torch.randn(B, S, N, 3, generator=g) * 8,
           "nrm": torch.nn.functional.normalize(torch.randn(B, S, N, 3, generator=g), dim=-1),
           "crv": torch.rand(B, S, N, NCH, generator=g) * 2 - 1,

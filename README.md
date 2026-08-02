@@ -202,9 +202,42 @@ not random: outer and inner helix slides correlate **+0.49**, concha and superio
 **−0.51** (they share a boundary, so moving it pushes one forward and the other back), and
 a subject's two ears **+0.30…+0.42**.
 
-The wall is that **nothing has yet predicted any of it from the ear**. Seven independent
+The wall is that **nothing has yet predicted any of it from the ear**. Ten independent
 attempts return out-of-fold R² ≤ 0, including ridge and gradient boosting on the *full
 255-coordinate predicted shape* — the strongest feature set available at test time.
+
+### Why: the model is already calibrated
+
+Two measurements taken together close off a whole class of fixes.
+
+The prediction is **under-dispersed**. Over the 200 most rigid cross-contour landmark
+pairs, the predicted separations vary *less* across ears than the ground-truth ones do:
+
+| | median CV(pred) / CV(GT) | MLE |
+| --- | ---: | ---: |
+| KPConv, 1 seed | 0.920 | 1.2881 |
+| PTv3, 1 seed | 0.904 | 1.2982 |
+| 5-model ensemble | 0.879 | 1.1827 |
+| + surface projection | 0.893 | 1.1776 |
+
+If a prediction were truth-plus-noise this ratio would exceed 1. Below 1 is shrinkage; it
+is present in every individual model and ensembling deepens it. So the model emits the
+population-*typical* ear, and real ears deviate from it — which is exactly the 28 degrees
+of freedom the oracle recovers.
+
+That is also what an MSE-trained model *should* do when part of the target is
+unpredictable: emit the conditional mean. The identity to check is
+`var(pred_k) = ρ²_k · var(gt_k)`, i.e. the optimal per-mode gain is 1. Fitting those gains
+out-of-fold on a fold-safe PCA basis of the training ears' shapes gives **1.000**, worth
++0.0002 mm (CI [−0.000, 0.0004]) — and per-mode, 1.00–1.02 for the modes the model
+predicts well, dropping to 0.85 for the one mode it barely predicts (ρ² = 0.26). The
+shrinkage is precisely calibrated.
+
+**Consequence.** The remaining 0.575 mm is *conditional variance* given the information
+the model currently uses. No architecture, no resolution, no ensemble and no rescaling of
+the existing output can remove it. Only **new information** — which measurably means the
+subject's other ear, whose slide correlates +0.30…+0.42 — or a **different target
+parameterisation** can.
 
 ---
 
@@ -224,6 +257,9 @@ the search. All measured under the protocol above.
 | 121-feature head/bilateral context probe | max OOF R² −0.015 | null |
 | Ridge / GBM on the full predicted shape | max OOF R² −0.023 | null |
 | 6 post-hoc residual correctors | OOF R² ≤ 0 | null |
+| Slide inherited from the coarse initialiser | OOF R² −0.09 | null |
+| Slides *solved* from cross-contour rigidity | 1.178 → 1.453 mm | harmful |
+| Per-mode variance recalibration | +0.0002 mm | already calibrated |
 
 Two of those deserve their footnote:
 

@@ -66,6 +66,55 @@ per-ear sum with the held-out SUBJECT's ears subtracted, and the code asserts th
 held-out ears contributed nothing (constraint 2). `true` is read only to place the
 anchors of TRAINING ears and to score the held-out ear -- never to build a feature.
 
+RESULT ON scratch/screen_data_8192crv.npz, 340 ears, 170 LOSO folds -- REDUNDANT, NOT NULL
+--------------------------------------------------------------------------------------
+Retrieval floor 0.5352mm. Position alone 3.6250mm (POS=mean) / 3.8186 (POS=coarse).
+
+  descriptor      best mm   delta   at w      (slot 0; slot 2 in brackets)
+  nrm (3 ch)       2.8492   -0.7758  0.25     [2.8568  -0.7623]
+  nrm+crv (15)     2.8809   -0.7441  0.05     [2.8698  -0.7493]
+  crv (12)         3.3639   -0.2611  0.01     [3.3551  -0.2640]
+  crv@6 (4)        3.3906   -0.2344  0.05     [3.3746  -0.2446]
+  crv@3 (4)        3.4141   -0.2109  0.05     [3.4084  -0.2108]
+  crv@1.5 (4)      3.4393   -0.1857  0.05     [3.4315  -0.1876]
+  shape_index (3)  3.5091   -0.1159  0.1      [3.4933  -0.1258]
+  crv_shuf (12)    3.6250    0.0000  0        [3.6191   0.0000]   control behaves
+
+THE WEIGHT GRID DECIDED THE VERDICT, AND THE FIRST GRID WAS WRONG. This table was
+originally run on WGRID=0.25,1,4,16,inf and reported curvature as NULL: crv, crv@1.5 and
+crv@3 all came out at exactly the position-only value because no tested w > 0 beat w = 0.
+The optimum for a 12-column descriptor is near w = 0.01 -- at w = 0.25 the 12 descriptor
+terms already swamp the 3 position terms. Same file, same slot, same code, only the grid
+changed: crv 3.6250 (0.0000) -> 3.3639 (-0.2611). The default WGRID now starts at 0.01.
+
+SO CURVATURE DOES CARRY SIGNAL, and it is not dimensionality: at the same w = 0.01 the
+shuffled control is 3.8202, i.e. 0.20mm WORSE than position alone while the real channel
+is 0.26mm BETTER -- a 0.46mm separation between a descriptor and its own shuffle.
+
+BUT IT IS REDUNDANT WITH NORMALS, which is the actual decision number. nrm alone 2.8492;
+nrm+crv 2.8809. Adding all 12 curvature channels on top of oriented normals costs
++0.0317mm under POS=mean and BUYS -0.0306mm under POS=coarse -- the sign is not even
+stable across the two position priors, so the honest reading is "no measurable effect",
+not the "+0.3126mm worse" the coarse grid produced. Per contour (POS=mean), nrm+crv minus
+nrm: outer +0.260, concha -0.356, inner_helix +0.358, sup._antihelix -0.027; under
+POS=coarse: outer -0.012, concha -0.315, inner_helix +0.520, sup._antihelix -0.325. The
+one contour curvature consistently helps is the CONCHA (a basin, seen by the r=6 block);
+the one it consistently hurts is the inner helix.
+
+This is not a broken channel: the shipped statistics are healthy (per-channel sd 0.048 to
+0.498, fewer than 3e-4 of values beyond |0.99|, no saturation), the estimator matches
+closed-form sphere/cylinder/saddle, and the shuffled control degrades exactly as it should.
+
+WHAT IT DOES AND DOES NOT LICENCE. Curvature is real but nearly all of what it says about
+a landmark's neighbourhood, THIS METRIC can already read off the oriented normal -- which
+makes sense, since the normal field's local variation IS the shape operator. So a naive
+15-channel concat is not the experiment to run; if curvature is tried, the case is the
+r=6mm block on the concha, or curvature INSTEAD of normals, not curvature on top. It does
+NOT prove a network cannot use curvature: this metric is unlearned, isotropic and
+per-landmark independent. Note the calibration -- normals score -0.7758 here and bought
+only -0.0481mm end to end, so this probe's scale is not a millimetre forecast, and a
++-0.03mm difference on it is far below anything it can resolve.
+
     python research/code/curv_probe.py            # -> research/results/curv_probe.json
     SMOKE=1 python research/code/curv_probe.py    # synthetic self-test, no data needed
 
@@ -82,7 +131,13 @@ from scipy.spatial import cKDTree
 
 SRC = os.environ.get("SRC", "scratch/screen_data_8192crv.npz")
 SLOT = int(os.environ.get("SLOT", "0"))
-WGRID = [float(x) for x in os.environ.get("WGRID", "0.25,1,4,16,inf").split(",")]
+# The grid MUST reach well below 0.25. The first version of this file started at 0.25 and
+# concluded that curvature was null (no w > 0 beat w = 0 for crv, crv@1.5 or crv@3); the
+# optimum for a 12-column descriptor is at w ~ 0.01, and at 0.25 the descriptor term is
+# already swamping the position term. Same data, same slot, only the grid changed:
+# crv went 3.6250 (delta 0.0000) -> 3.3639 (delta -0.2611). See the RESULT block above.
+WGRID = [float(x) for x in
+         os.environ.get("WGRID", "0.01,0.05,0.1,0.25,1,4,16,inf").split(",")]
 OUT = os.environ.get("OUT", "research/results/curv_probe.json")
 CONTOURS = [("outer_helix", 0, 24), ("concha", 25, 54),
             ("inner_helix", 55, 74), ("sup._antihelix", 75, 84)]
@@ -223,6 +278,18 @@ def table(err, floor, sets, wgrid, log=print):
                        (eb.mean(0) < e0.mean(0)).sum()),
                    "hit_2mm": round(float((eb < 2.0).mean()), 4)}
             rows.append(row)
+        # The first version of this file drew the WRONG CONCLUSION because its grid started
+        # past the optimum: every descriptor pinned at w = 0 and curvature read as null.
+        # "Pinned at an endpoint" is the observable symptom, so say so instead of relying on
+        # a reader noticing. wlo firing means the true optimum may be BELOW the grid (the
+        # descriptor is being under-weighted and its delta understated); whi means above.
+        pos = [w for w in wgrid if w > 0 and np.isfinite(w)]
+        wlo = [n for n in sets if min(wgrid, key=lambda w: err[(n, pk, w)].mean()) == min(pos)]
+        whi = [n for n in sets if min(wgrid, key=lambda w: err[(n, pk, w)].mean()) == max(pos)]
+        for tag, names, side in (("smallest", wlo, min(pos)), ("largest", whi, max(pos))):
+            if names:
+                log(f"  !! best w is the {tag} tested weight ({side:g}) for {names} -- the "
+                    f"optimum may lie past the grid; widen WGRID before reading their delta")
     return rows
 
 

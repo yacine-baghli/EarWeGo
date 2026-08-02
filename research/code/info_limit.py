@@ -152,6 +152,9 @@ ENV (defaults in brackets)
   CREST_IDX [1]      which RADII entry the crest curvature uses
   CREST_HALF [3.0] CREST_BAND [0.5] CREST_BIN [0.25] CREST_PROM [0.03]
   EXCL [subject]     subject | fold  (fold additionally drops the whole frozen fold)
+  METRIC [global]    global | perlm.  perlm rescales every descriptor dimension by its
+                     cross-subject spread AT THIS LANDMARK, taken from the reference ears
+                     only -- a strictly stronger, still leakage-free matcher.
   ROT_INV [0]        1 = orientation-independent descriptor variant
   PRED [scratch/ensemble5_proj.npy]   frozen 1.1776mm OOF prediction, world frame
   OUT [research/results/info_limit.json]
@@ -198,6 +201,7 @@ CREST_BAND = float(os.environ.get("CREST_BAND", "0.5"))
 CREST_BIN = float(os.environ.get("CREST_BIN", "0.25"))
 CREST_PROM = float(os.environ.get("CREST_PROM", "0.03"))
 EXCL = os.environ.get("EXCL", "subject")
+METRIC = os.environ.get("METRIC", "global")
 ROT_INV = int(os.environ.get("ROT_INV", "0"))
 PRED = os.environ.get("PRED", "scratch/ensemble5_proj.npy")
 OUT = os.environ.get("OUT", "research/results/info_limit.json")
@@ -296,6 +300,33 @@ def principal(c3, c4, c5):
     return tr + dt, tr - dt
 
 
+def curv_calibration(radii=(2.0, 3.0, 5.0, 10.0)):
+    """WHAT FRACTION OF THE TRUE NORMAL CURVATURE DOES kappa_dir RECOVER?
+
+    A quadric fitted over a ball of radius r on a feature of radius of curvature R is
+    only second-order accurate when r << R.  A helix rim has R ~ 2-3mm and CREST_IDX
+    defaults to r=3mm, so this is NOT a small correction -- measure it, do not assume it.
+    Exact sphere, sampled at the SAME per-scale spacing r/SPACE_DIV the real run uses
+    (density matters: at higher density KNB truncates the support and flatters the fit).
+    Returns {R: [fraction of -1/R recovered at each scale]}.
+    """
+    out = {}
+    for Rs in radii:
+        SP, SN, tr = [], [], []
+        for r in RADII:
+            h = r / SPACE_DIV
+            n = max(64, int(round(4 * np.pi * Rs ** 2 / h ** 2)))
+            rng = np.random.RandomState(0)
+            Q = rng.randn(n, 3); Q /= np.linalg.norm(Q, axis=1, keepdims=True)
+            SP.append(Q * Rs); SN.append(Q); tr.append(cKDTree(Q * Rs))
+        p = np.array([[0, 0, Rs], [Rs, 0, 0.]]); pn = p / Rs
+        t1, t2 = tangent_basis(pn)
+        Dq, _ = describe(p, pn, t1, t2, tr, SP, SN)
+        out[Rs] = [round(float(kappa_dir(Dq, s, np.ones(2), np.zeros(2)).mean()
+                               / (-1.0 / Rs)), 3) for s in range(NS)]
+    return out
+
+
 def kappa_dir(D, s, al, be):
     """normal curvature in the tangent direction (al,be) from scale-s coefficients, 1/mm"""
     o = s * NF
@@ -321,7 +352,12 @@ class Ear:
         P, N = sample_faces(V, self.F, VN, DENSE_H)
         rng = np.random.RandomState(SEED)
         perm = rng.permutation(len(P))
-        self.h0 = float(np.sqrt(0.5 * a2.sum() / len(P)))
+        self.area = float(0.5 * a2[a2 > 1e-12].sum())
+        self.nP = len(P)
+        self.h0 = float(np.sqrt(self.area / self.nP))
+        T = self.V[self.F]
+        self.medge = float(np.median(np.linalg.norm(
+            np.concatenate([T[:, 1] - T[:, 0], T[:, 2] - T[:, 1], T[:, 0] - T[:, 2]]), axis=1)))
         self.SP, self.SN, self.trees = [], [], []
         for r in RADII:
             n = int(min(len(P), max(64, round(len(P) * min(1.0, (self.h0 / (r / SPACE_DIV)) ** 2)))))
@@ -400,7 +436,8 @@ def contour_tangent(G):
 KEYS = ["nn1_pred", "nn1_gt", "pro_pred", "pro_gt", "floor_pred", "floor_gt",
         "chance_pred", "chance_gt", "ctr_pred", "rank_pred", "rank_gt", "nn1_gt_fold",
         "nn1_gt_along", "nn1_gt_across", "nn1_pred_along", "nn1_pred_across",
-        "nn1_1d_along", "nn1_1d_across", "chance_1d", "nn1_pair"]
+        "nn1_1d_along", "nn1_1d_across", "chance_1d_along", "chance_1d_across",
+        "nn1_pair"]
 KEYS += [f"nn1_s{j}" for j in range(NS)] + [
         "S", "S_along", "S_across", "ncand", "crest_ok", "crest_off", "ridge0"]
 
@@ -437,13 +474,23 @@ def scan_landmark(e, g, gn, tc, pr, C0, CN0, DC0, Ref, RefF, Dg, mu, sd, res, Pa
     """
     if len(C0) < 20:
         return
-    ok = CN0 @ gn > CAND_NDOT
-    if ok.sum() < 20:
+    okg = CN0 @ gn > CAND_NDOT      # gates every statistic that is ALLOWED to know gt
+    if okg.sum() < 20:
         return
-    C, CN, DC = C0[ok], CN0[ok], DC0[ok]
+    C, CN, DC = C0, CN0, DC0
     ZC = (DC - mu) / sd
+    if METRIC == "perlm":
+        # A GLOBAL diagonal whitening is the weakest defensible metric: it down-weights
+        # nothing that varies across landmarks but not within one.  Rescaling by the
+        # cross-subject spread AT THIS LANDMARK (reference ears only, so still held out)
+        # is the obvious stronger matcher, and is the cheapest test of "a learned metric
+        # would do better".  Everything compared must be rescaled identically.
+        wl = Ref.std(0) + 1e-3
+        Ref, ZC, Dg = Ref / wl, ZC / wl, Dg / wl
+        RefF = None if RefF is None else RefF / wl
+        Pair = None if Pair is None else Pair / wl
     dg = np.linalg.norm(C - g, axis=1)
-    res["ncand"] = len(C)
+    res["ncand"] = int(okg.sum())
     res["ctr_pred"] = float(np.linalg.norm(pr - g))
 
     tt = tc - gn * (tc @ gn)
@@ -458,9 +505,14 @@ def scan_landmark(e, g, gn, tc, pr, C0, CN0, DC0, Ref, RefF, Dg, mu, sd, res, Pa
 
     dnn = nn(Ref)
     dpr = np.linalg.norm(ZC - Ref.mean(0), axis=1)
-    j0 = int(dg.argmin())
-    for nm, msk in (("gt", dg <= SEARCH_R),
-                    ("pred", np.linalg.norm(C - pr, axis=1) <= SEARCH_R)):
+    j0 = int(np.where(okg, dg, np.inf).argmin())
+    # the PRED window is gated on the surface normal at the candidate nearest the
+    # PREDICTION.  Gating it on gn -- as this file used to -- feeds the truth's normal
+    # into a number that claims to say what a matcher could do WITHOUT the truth.
+    pn = CN0[int(np.linalg.norm(C0 - pr, axis=1).argmin())]
+    for nm, msk in (("gt", okg & (dg <= SEARCH_R)),
+                    ("pred", (CN0 @ pn > CAND_NDOT)
+                             & (np.linalg.norm(C - pr, axis=1) <= SEARCH_R))):
         if msk.sum() < 20:
             continue
         ix = np.flatnonzero(msk)
@@ -473,7 +525,7 @@ def scan_landmark(e, g, gn, tc, pr, C0, CN0, DC0, Ref, RefF, Dg, mu, sd, res, Pa
         res[f"chance_{nm}"] = float(np.median(dg[ix]))
         if msk[j0]:
             res[f"rank_{nm}"] = float((dnn[ix] < dnn[j0]).mean())
-    ixg = np.flatnonzero(dg <= SEARCH_R)
+    ixg = np.flatnonzero(okg & (dg <= SEARCH_R))
     if len(ixg) >= 20:
         if RefF is not None:
             res["nn1_gt_fold"] = dg[ixg[nn(RefF)[ixg].argmin()]]
@@ -492,16 +544,18 @@ def scan_landmark(e, g, gn, tc, pr, C0, CN0, DC0, Ref, RefF, Dg, mu, sd, res, Pa
             res[f"nn1_s{j}"] = dg[ixg[np.sqrt(np.maximum(gm, 0)).min(1)[ixg].argmin()]]
 
     # ---- 1-D matchers: how much information is there in ONE direction at a time?
+    # Each strip gets its OWN chance: the candidate cloud is not isotropic (the normal
+    # gate truncates the across strip harder than the along one), so one shared chance
+    # number silently biases the along/across comparison, which is the whole point here.
     for nm, x, y in (("along", st, sa), ("across", sa, st)):
-        m = (np.abs(y) <= CREST_BAND) & (np.abs(x) <= SEARCH_R)
+        m = okg & (np.abs(y) <= CREST_BAND) & (np.abs(x) <= SEARCH_R)
         if m.sum() >= 12:
             ix = np.flatnonzero(m)
             res[f"nn1_1d_{nm}"] = abs(x[ix[dnn[ix].argmin()]])
-            if nm == "across":
-                res["chance_1d"] = float(np.median(np.abs(x[ix])))
+            res[f"chance_1d_{nm}"] = float(np.median(np.abs(x[ix])))
 
     # ---- (2) how fast the descriptor changes with distance along the surface
-    near = (dg <= SHARP_R) & (dg > 1e-9)
+    near = okg & (dg <= SHARP_R) & (dg > 1e-9)
     if near.sum() >= 20:
         dd = np.linalg.norm(ZC - Dg, axis=1)
         res["S"] = (dg[near] * dd[near]).sum() / (dg[near] ** 2).sum()
@@ -514,7 +568,7 @@ def scan_landmark(e, g, gn, tc, pr, C0, CN0, DC0, Ref, RefF, Dg, mu, sd, res, Pa
                 res[nm] = (x * y).sum() / (x * x).sum()
 
     # ---- (3) crest across the contour
-    band = (np.abs(st) <= CREST_BAND) & (np.abs(sa) <= CREST_HALF)
+    band = okg & (np.abs(st) <= CREST_BAND) & (np.abs(sa) <= CREST_HALF)
     if band.sum() < 12:
         return
     aq = av - CN[band] * (CN[band] @ av)[:, None]
@@ -586,7 +640,7 @@ def run():
     us = np.unique(subj)
     print(f"[info_limit] {NE} ears  desc {ND}d  scales {RADII}  KNB={KNB} "
           f"DENSE_H={DENSE_H} CAND_H={CAND_H} SEARCH_R={SEARCH_R} EXCL={EXCL} "
-          f"ROT_INV={ROT_INV}", flush=True)
+          f"METRIC={METRIC} ROT_INV={ROT_INV}", flush=True)
     print(f"             frozen prediction {PRED}: pooled {err_now.mean():.4f}mm", flush=True)
 
     scan_s = us if N_SCAN <= 0 else np.sort(
@@ -597,18 +651,21 @@ def run():
     # ---------------- pass 1: descriptor at the true landmark of EVERY ear
     # Cached on a signature of everything that can change a reference descriptor, so a
     # rerun with a different N_SCAN / EXCL does not repay the 10 minutes.
-    sigk = json.dumps([RADII, KNB, SPACE_DIV, DENSE_H, NDOT, MMAX, REG, ROT_INV, SEED, NE])
+    sigk = json.dumps(["v2", RADII, KNB, SPACE_DIV, DENSE_H, NDOT, MMAX, REG, ROT_INV,
+                       SEED, NE])
     D = GTP = None
     if os.path.exists(REF_CACHE):
         z = np.load(REF_CACHE, allow_pickle=True)
         if str(z["sig"]) == sigk:
-            D, GTP, GTN, gtdist, h0, nsmp, trunc = (z["D"], z["GTP"], z["GTN"], z["gtdist"],
-                                                    z["h0"], z["nsmp"], z["trunc"])
+            D, GTP, GTN, gtdist, h0, nsmp, trunc, ndense, area, medge = (
+                z["D"], z["GTP"], z["GTN"], z["gtdist"], z["h0"], z["nsmp"], z["trunc"],
+                z["ndense"], z["area"], z["medge"])
             print(f"  reusing reference descriptors from {REF_CACHE}", flush=True)
     cache, t0 = {}, time.time()
     if D is None:
         D = np.zeros((NE, NL, ND)); GTP = np.zeros((NE, NL, 3)); GTN = np.zeros((NE, NL, 3))
         gtdist = np.zeros((NE, NL)); h0 = np.zeros(NE); nsmp = np.zeros(NE)
+        ndense = np.zeros(NE); area = np.zeros(NE); medge = np.zeros(NE)
         trunc = np.zeros(NS)
         for i in range(NE):
             e = load_ear(i, md, cache)
@@ -617,12 +674,19 @@ def run():
             D[i], tr = e.desc_at(q, n)
             trunc += tr
             h0[i], nsmp[i] = e.h0, len(e.SP[0])
+            ndense[i], area[i], medge[i] = e.nP, e.area, e.medge
             if (i + 1) % 20 == 0 or i + 1 == NE:
                 el = time.time() - t0
                 print(f"  refs {i+1}/{NE}  {el:.0f}s  eta {el/(i+1)*(NE-i-1):.0f}s  "
-                      f"samples {len(e.SP[0])}  h0 {e.h0:.3f}mm", flush=True)
+                      f"dense {e.nP} at {e.h0:.3f}mm  scale-0 {len(e.SP[0])} at "
+                      f"{max(e.h0, RADII[0]/SPACE_DIV):.3f}mm  tri {e.medge:.3f}mm",
+                      flush=True)
         np.savez(REF_CACHE, sig=sigk, D=D, GTP=GTP, GTN=GTN, gtdist=gtdist, h0=h0,
-                 nsmp=nsmp, trunc=trunc)
+                 nsmp=nsmp, trunc=trunc, ndense=ndense, area=area, medge=medge)
+    print(f"  crop: area {np.median(area):.0f}mm^2  native triangle "
+          f"{np.median(medge):.3f}mm  dense {int(np.median(ndense))} samples at "
+          f"{np.median(h0):.4f}mm  (= sqrt(area/n), checked)")
+    assert abs(np.median(h0) - np.sqrt(np.median(area) / np.median(ndense))) < 5e-3
     print(f"  GT -> native surface mm: mean {gtdist.mean():.4f}  p99 "
           f"{np.percentile(gtdist,99):.4f}  max {gtdist.max():.4f}  "
           f"over 0.5mm: {int((gtdist>0.5).sum())}/{NE*NL}")
@@ -668,14 +732,18 @@ def run():
         print(f"  scan {a+1}/{len(scan)} (ear {i})  {el:.0f}s  "
               f"eta {el/(a+1)*(len(scan)-a-1):.0f}s", flush=True)
 
+    np.savez(RAW, scan=scan, **O)      # every per-(ear, landmark) statistic, so the
+    print(f"  raw statistics -> {RAW}")  # table and correlations can be redone free
+
     print("\nTHE FROZEN MODEL IN THE SAME FRAME, ON THE SAME EARS")
     mdir = model_directional(GTP, GTN, PR, scan)
     report(O, sig, err_now, gtdist, h0, nsmp, trunc, scan, subj, NE, time.time() - t00,
-           mdir)
+           mdir, ndense, area, medge)
 
 
 # ------------------------------------------------------------------ reporting
-def report(O, sig, err_now, gtdist, h0, nsmp, trunc, scan, subj, NE, secs, mdir=None):
+def report(O, sig, err_now, gtdist, h0, nsmp, trunc, scan, subj, NE, secs, mdir,
+           ndense, area, medge):
     nmed = lambda a: np.nan if not np.isfinite(a).any() else float(np.nanmedian(a))
     med = {k: np.array([nmed(O[k][:, j]) for j in range(NL)]) for k in O}
     med["crest_ok"] = np.array([np.nan if not np.isfinite(O["crest_ok"][:, j]).any()
@@ -754,7 +822,7 @@ def report(O, sig, err_now, gtdist, h0, nsmp, trunc, scan, subj, NE, secs, mdir=
     pool = {}
     for k in (["ctr_pred", "nn1_pred", "pro_pred", "nn1_gt", "pro_gt", "nn1_gt_fold",
                "nn1_pair", "nn1_gt_along", "nn1_gt_across", "nn1_1d_along",
-               "nn1_1d_across", "chance_1d"]
+               "chance_1d_along", "nn1_1d_across", "chance_1d_across"]
               + [f"nn1_s{j}" for j in range(NS)] + ["floor_gt", "chance_gt", "rank_gt"]):
         v = O[k][np.isfinite(O[k])]
         pool[k] = dict(mean=round(float(v.mean()), 4), median=round(float(np.median(v)), 4),
@@ -767,6 +835,66 @@ def report(O, sig, err_now, gtdist, h0, nsmp, trunc, scan, subj, NE, secs, mdir=
                                     delta_mm=round(float(d.mean()), 4))
     print(f"  NN1 as a refiner of the frozen prediction: {(d<0).mean()*100:.1f}% of "
           f"(ear,landmark) improved, mean delta {d.mean():+.4f} mm")
+
+    for nm, a in (("along", "nn1_1d_along"), ("across", "nn1_1d_across")):
+        c = O[f"chance_1d_{nm}"]
+        w = np.isfinite(O[a]) & np.isfinite(c)
+        r = float(O[a][w].mean() / c[w].mean())
+        pool[f"ratio_1d_{nm}"] = round(r, 4)
+        km = med[a] < med[f"chance_1d_{nm}"] / 1.6
+        pool[f"beats_chance_1p6x_{nm}"] = dict(
+            n=int(km.sum()), landmarks=np.flatnonzero(km).tolist(),
+            per_contour={nmm: int(km[lo:hi + 1].sum()) for lo, hi, nmm in CONT})
+        print(f"  1-D {nm:<6} matcher / its OWN chance = {r:.3f}   "
+              f"(<1 = information)   beats chance by 1.6x at {int(km.sum())}/85 "
+              f"{ {nmm: int(km[lo:hi+1].sum()) for lo, hi, nmm in CONT} }")
+
+    # ---- crest offsets: BOTH aggregations, because they disagree.  A median of
+    # per-landmark medians of a 0.25mm-binned quantity snaps to a bin and reads far
+    # larger than the mean; the pooled mean +- its standard error is the honest number.
+    print("\nCREST OFFSET (mm, signed gt->crest across the contour)")
+    off_mu = np.array([np.nan if not np.isfinite(O["crest_off"][:, j]).any()
+                       else float(np.nanmean(O["crest_off"][:, j])) for j in range(NL)])
+    pool["crest_off_per_contour"] = {}
+    print(f"  {'contour':<16}{'medmed':>9}{'meanmean':>10}{'pooled':>9}{'sd':>8}"
+          f"{'se':>8}{'n':>7}")
+    for lo, hi, nmm in CONT + [(0, 84, "ALL")]:
+        v = O["crest_off"][:, lo:hi + 1]; v = v[np.isfinite(v)]
+        d = dict(median_of_medians=round(float(np.nanmedian(med["crest_off"][lo:hi + 1])), 4),
+                 mean_of_means=round(float(np.nanmean(off_mu[lo:hi + 1])), 4),
+                 pooled_mean=round(float(v.mean()), 4), sd=round(float(v.std()), 4),
+                 se=round(float(v.std() / np.sqrt(len(v))), 4), n=int(len(v)))
+        pool["crest_off_per_contour"][nmm] = d
+        print(f"  {nmm:<16}{d['median_of_medians']:>+9.3f}{d['mean_of_means']:>+10.3f}"
+              f"{d['pooled_mean']:>+9.3f}{d['sd']:>8.3f}{d['se']:>8.4f}{d['n']:>7d}")
+    print(f"  mean |per-landmark offset|: means {np.nanmean(np.abs(off_mu)):.4f}  "
+          f"medians {np.nanmean(np.abs(med['crest_off'])):.4f}   "
+          f"|mean|>0.5mm at {int((np.abs(off_mu) > 0.5).sum())}/85, "
+          f">0.75mm at {int((np.abs(off_mu) > 0.75).sum())}/85")
+    pool["crest_off_abs_mean"] = round(float(np.nanmean(np.abs(off_mu))), 4)
+
+    lft = (scan % 2) == 0              # ears are stored (left, right) per subject
+    for nmm, m in (("left", lft), ("right", ~lft)):
+        v = O["crest_off"][m]; v = v[np.isfinite(v)]
+        print(f"  crest offset, {nmm:<5} ears: mean {v.mean():+.4f}  median "
+              f"{np.median(v):+.4f}  sd {v.std():.4f}  n {len(v)}")
+        pool[f"crest_off_{nmm}"] = dict(mean=round(float(v.mean()), 4),
+                                        sd=round(float(v.std()), 4), n=int(len(v)))
+    # a reflection bug flips the sign of a curvature; these must agree, and do.
+    for nm, src2 in (("crest_off", O["crest_off"]), ("ridge0", O["ridge0"])):
+        a = np.array([np.nan if not np.isfinite(src2[lft, j]).any()
+                      else float(np.nanmean(src2[lft, j])) for j in range(NL)])
+        b = np.array([np.nan if not np.isfinite(src2[~lft, j]).any()
+                      else float(np.nanmean(src2[~lft, j])) for j in range(NL)])
+        w = np.isfinite(a) & np.isfinite(b)
+        rr = float(np.corrcoef(a[w], b[w])[0, 1])
+        pool[f"lr_{nm}"] = dict(pearson=round(rr, 4),
+                                mean_abs_diff=round(float(np.abs(a[w] - b[w]).mean()), 4),
+                                sign_agree=int((np.sign(a[w]) == np.sign(b[w])).sum()),
+                                n=int(w.sum()))
+        print(f"  left/right per-landmark {nm:<10} pearson {rr:.4f}  mean|L-R| "
+              f"{np.abs(a[w]-b[w]).mean():.4f}  sign agrees "
+              f"{int((np.sign(a[w])==np.sign(b[w])).sum())}/{int(w.sum())}")
 
     print("\nSPEARMAN AGAINST THE CURRENT PER-LANDMARK ERROR (n=85)")
     C = {}
@@ -800,14 +928,31 @@ def report(O, sig, err_now, gtdist, h0, nsmp, trunc, scan, subj, NE, secs, mdir=
     out = dict(
         config=dict(radii=list(RADII), knb=KNB, space_div=SPACE_DIV, dense_h=DENSE_H,
                     cand_h=CAND_H, search_r=SEARCH_R, ndot=NDOT, cand_ndot=CAND_NDOT,
-                    sharp_r=SHARP_R, excl=EXCL, rot_inv=ROT_INV, pred=PRED, seed=SEED,
-                    n_desc_dims=ND, crest=dict(idx=CREST_IDX, r=RADII[CREST_IDX],
+                    sharp_r=SHARP_R, excl=EXCL, metric=METRIC, rot_inv=ROT_INV, pred=PRED,
+                    seed=SEED,
+                    n_desc_dims=ND,
+                    # fraction of the TRUE normal curvature kappa_dir recovers on a
+                    # sphere of radius R.  At CREST_IDX's radius on a 2-3mm helix rim
+                    # this is a few percent: |ridge0| is NOT a calibrated curvature and
+                    # the crest profile it is read from is heavily flattened.
+                    curvature_recovered_vs_sphere_R=curv_calibration(),
+                    crest=dict(idx=CREST_IDX, r=RADII[CREST_IDX],
                                                half=CREST_HALF, band=CREST_BAND,
                                                bin=CREST_BIN, prom=CREST_PROM)),
         n_ears=int(NE), n_scan_ears=int(len(scan)),
         scan_subjects=sorted(set(int(subj[i]) for i in scan)),
-        surface=dict(sample_spacing_mm=round(float(np.median(h0)), 4),
-                     samples_per_ear=int(np.median(nsmp)),
+        surface=dict(dense_spacing_mm=round(float(np.median(h0)), 4),
+                     dense_samples_per_ear=int(np.median(ndense)),
+                     # the descriptor at scale r does NOT see the dense set: it sees a
+                     # subsample at max(h0, r/SPACE_DIV).  Quoting the dense spacing next
+                     # to the finest-scale count (as this file used to) overstates the
+                     # resolution the measurement actually ran at.
+                     descriptor_spacing_mm=[round(max(float(np.median(h0)), r / SPACE_DIV), 4)
+                                            for r in RADII],
+                     samples_per_ear_finest_scale=int(np.median(nsmp)),
+                     candidate_spacing_mm=CAND_H,
+                     native_triangle_mm=round(float(np.median(medge)), 4),
+                     crop_area_mm2=round(float(np.median(area)), 1),
                      gt_to_surface_mm=dict(mean=round(float(gtdist.mean()), 5),
                                            p99=round(float(np.percentile(gtdist, 99)), 5),
                                            max=round(float(gtdist.max()), 5),
@@ -824,8 +969,11 @@ def report(O, sig, err_now, gtdist, h0, nsmp, trunc, scan, subj, NE, secs, mdir=
                           **{f"nn1_s{j}": med[f"nn1_s{j}"] for j in range(NS)},
                           S_along=med["S_along"], S_across=med["S_across"], sigma=sig,
                           lam=lam, lam_along=lam_al, lam_across=lam_ac,
+                          chance_1d_along=med["chance_1d_along"],
+                          chance_1d_across=med["chance_1d_across"],
                           ridge0=med["ridge0"], crest_ok=med["crest_ok"],
-                          crest_off=med["crest_off"], crest_off_sd=off_sd,
+                          crest_off=med["crest_off"], crest_off_mean=off_mu,
+                          crest_off_sd=off_sd,
                           ncand=med["ncand"]).items()},
         per_contour=rows, pooled=pool, correlations=C, frozen_model_directional=mdir,
         geometrically_determined=np.flatnonzero(det).tolist(),
@@ -850,6 +998,27 @@ def report(O, sig, err_now, gtdist, h0, nsmp, trunc, scan, subj, NE, secs, mdir=
             "The scan uses a subset of ears (N_SCAN); per-landmark entries are medians "
             "over that subset, so a single per-landmark value carries the sampling error "
             "of that many observations.",
+            "The FINEST descriptor scale is RADII[0]=%.1fmm radius, sampled at %.2fmm. "
+            "Nothing between the native %.2fmm triangle and that radius is probed, so the "
+            "monotone 'finer scale carries less' trend is measured over [%.1f, %.1f]mm "
+            "and EXTRAPOLATED below it." % (RADII[0], max(float(np.median(h0)),
+                                            RADII[0] / SPACE_DIV), float(np.median(medge)),
+                                            RADII[0], RADII[-1]),
+            "The matcher losing to the frozen model does NOT show the surface lacks the "
+            "information: the model extracting more proves this descriptor is a WEAK "
+            "lower bound. What the scale sweep does show is that within this family, "
+            "resolution is not the missing ingredient.",
+            "config['curvature_recovered_vs_sphere_R'] measures kappa_dir against an "
+            "exact sphere at the run's own sampling density: within 3% when the feature "
+            "radius is >=10mm, but +31% at R=3mm and +109% at R=2mm for r=3mm. |ridge0| "
+            "is therefore a MONOTONE BUT UNCALIBRATED curvature on helix rims (2-3mm), "
+            "its absolute value should not be read as 1/mm, and the null abs_ridge0 "
+            "correlation is weak evidence. Crest LOCATION is much more robust: the "
+            "synthetic symmetric ridge gives a 0.00mm offset, and CREST_IDX=0 moves the "
+            "per-contour pooled offsets by <=0.16mm.",
+            "Crest offsets are binned at CREST_BIN, so a median of per-landmark medians "
+            "snaps to a bin and reads much larger than the mean. pooled['crest_off_"
+            "per_contour'] carries both plus the standard error; use the pooled mean.",
         ],
         runtime_s=round(secs, 1))
     os.makedirs(os.path.dirname(OUT) or ".", exist_ok=True)
@@ -919,6 +1088,14 @@ def smoke():
                   f"h0={e.h0:.3f}mm | candidates {len(e.CP)} | truncated/pt "
                   f"{np.round(tr/NL,4).tolist()}")
             print(f"  GT -> surface mm max {dd.max():.4f}   descriptor {D[i].shape}")
+            cal = curv_calibration()
+            print("  curvature recovered vs true 1/R (sphere):")
+            for Rs, fr in cal.items():
+                print(f"    R={Rs:>5.1f}mm  " + "  ".join(
+                    f"r={r}: {100*f:5.1f}%" for r, f in zip(RADII, fr)))
+            assert abs(cal[10.0][0] - 1.0) < 0.05, "must be accurate when r << R"
+            assert cal[2.0][NS - 1] > 1.5, \
+                "must be shown to blow up when r >> R -- |ridge0| is not a curvature there"
             fl, rg = D[i, 25:55], D[i, 0:25]
             print(f"  mean |quadratic coeffs| at r={RADII[1]}mm: plane "
                   f"{np.abs(fl[:,NF+3:NF+6]).mean():.4f}   ridge "
@@ -956,7 +1133,9 @@ def smoke():
     for nm, a in (("NN1 match error", g("nn1_gt")), ("  along the contour", g("nn1_gt_along")),
                   ("  across the contour", g("nn1_gt_across")),
                   ("1-D along matcher", g("nn1_1d_along")),
+                  ("  its own chance", g("chance_1d_along")),
                   ("1-D across matcher", g("nn1_1d_across")),
+                  ("  its own chance", g("chance_1d_across")),
                   ("grid floor", g("floor_gt")), ("chance", g("chance_gt")),
                   ("lambda", lam), ("lambda_along", lam_al), ("lambda_across", lam_ac),
                   ("NN1 vs paired ear", g("nn1_pair")),
@@ -973,6 +1152,12 @@ def smoke():
     assert np.nanmedian(g("nn1_gt_along")[A]) > 2 * np.nanmedian(g("nn1_gt_across")[A]), \
         "a straight ridge must localise across but not along"
     assert np.nanmedian(g("nn1_1d_across")[A]) < 0.4, "1-D across a ridge must be sharp"
+    for nm in ("along", "across"):    # each strip must get its OWN chance, both defined
+        assert np.isfinite(g(f"chance_1d_{nm}")).mean() > 0.9, f"chance_1d_{nm} missing"
+    assert np.nanmedian(g("nn1_1d_along")[A]) > 0.8 * np.nanmedian(g("chance_1d_along")[A]), \
+        "along a straight ridge the 1-D matcher must be no better than ITS OWN chance"
+    assert np.nanmedian(g("nn1_1d_across")[A]) < 0.3 * np.nanmedian(g("chance_1d_across")[A]), \
+        "across a straight ridge the 1-D matcher must crush ITS OWN chance"
     assert np.nanmedian(lam[B]) < np.nanmedian(lam[P]), "bump must be sharper than plane"
     assert np.nanmedian(g("crest_ok")[A]) == 1.0 and np.nanmedian(g("crest_ok")[P]) == 0.0, \
         "the crest test must fire on a ridge and not on a plane"

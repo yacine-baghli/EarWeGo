@@ -1,0 +1,131 @@
+{
+ "baseline_mm": 1.1776,
+ "n_ears": 340,
+ "n_bootstrap": 20000,
+ "identity": "for a conditional-mean predictor var(pred_k) = rho_k^2 var(gt_k), equivalently the optimal per-mode gain a_k = 1",
+ "runs": {
+  "global_K40": {
+   "mle_mm": 1.1778,
+   "delta_mm": 0.0002,
+   "ci95": [
+    -0.0,
+    0.0004
+   ],
+   "verdict": "INDISTINGUISHABLE",
+   "gain_mean": 1.0011,
+   "gain_sd_across_folds": 0.002
+  },
+  "global_K120": {
+   "mle_mm": 1.1779,
+   "delta_mm": 0.0002,
+   "ci95": [
+    -0.0001,
+    0.0005
+   ],
+   "verdict": "INDISTINGUISHABLE",
+   "gain_mean": 0.9972,
+   "gain_sd_across_folds": 0.0019
+  },
+  "pooled3_K40": {
+   "mle_mm": 1.1792,
+   "delta_mm": 0.0016,
+   "ci95": [
+    0.0009,
+    0.0022
+   ],
+   "verdict": "HARMFUL",
+   "gain_mean": 0.985,
+   "gain_sd_across_folds": 0.0035
+  },
+  "pooled3_K120": {
+   "mle_mm": 1.1908,
+   "delta_mm": 0.0131,
+   "ci95": [
+    0.0116,
+    0.0147
+   ],
+   "verdict": "HARMFUL",
+   "gain_mean": 0.7627,
+   "gain_sd_across_folds": 0.0058
+  },
+  "per_mode_K40": {
+   "mle_mm": 1.1858,
+   "delta_mm": 0.0081,
+   "ci95": [
+    0.0052,
+    0.0111
+   ],
+   "verdict": "HARMFUL",
+   "gain_mean": 0.9472,
+   "gain_sd_across_folds": 0.0322
+  },
+  "per_mode_K120": {
+   "mle_mm": 1.1952,
+   "delta_mm": 0.0176,
+   "ci95": [
+    0.0144,
+    0.0208
+   ],
+   "verdict": "HARMFUL",
+   "gain_mean": 0.6976,
+   "gain_sd_across_folds": 0.0282
+  }
+ },
+ "per_mode_detail": {
+  "gain_first20": [
+   1.0038,
+   1.0074,
+   1.0028,
+   1.0082,
+   1.0128,
+   0.8529,
+   1.0221,
+   1.0236,
+   1.0133,
+   1.013,
+   1.0124,
+   1.0319,
+   1.0271,
+   1.0046,
+   1.0375,
+   1.0024,
+   1.0041,
+   0.8934,
+   0.9387,
+   0.9418
+  ],
+  "rho2_first20": [
+   0.9863,
+   0.8947,
+   0.9636,
+   0.9331,
+   0.7935,
+   0.2624,
+   0.7558,
+   0.8661,
+   0.8883,
+   0.7282,
+   0.8332,
+   0.8271,
+   0.8082,
+   0.8727,
+   0.7508,
+   0.7568,
+   0.7429,
+   0.6564,
+   0.6135,
+   0.6373
+  ],
+  "gain_mean_40": 0.9472,
+  "gain_frac_above_1": 0.4
+ },
+ "best_config": "global_K40",
+ "verdict": "CALIBRATED",
+ "conclusion": "Mean out-of-fold gain over the first 40 shape modes is 0.947, and at or below one in 40% of them. Best configuration global_K40: 1.1778 mm (+0.0002, CI [-0.0, 0.0004]). The model is CALIBRATED: its under-dispersion is exactly what minimising MSE against a partly unpredictable target requires, so no rescaling of what it already produces can help. Together with contour_rigidity.py this closes the question the shrinkage raised -- the remaining error is conditional variance, and only new information or a different target can reduce it.",
+ "caveats": [
+  "The PCA basis, the mean shape and the gains all come from the outer fold's TRAINING ears; held-out ears contribute nothing to any of them.",
+  "Gains are clipped to [0.5,2.0] so a near-zero-variance mode cannot explode.",
+  "The component of the prediction outside the K-mode basis is passed through untouched, so K controls only how much of the shape is recalibrated.",
+  "rho^2 per mode is computed on held-out ears and is reported for interpretation, not used to set any gain."
+ ]
+}

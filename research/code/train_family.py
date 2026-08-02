@@ -60,7 +60,12 @@ ENVIRONMENT (all optional except FAMILY; every value is echoed into the report)
                        choice, rotation, scale, jitter and subsample draws are byte-for-
                        byte what ACCUM=1 would have drawn, so an ACCUM>1 arm is not
                        silently a different seed.
-                   Dropout still draws its masks per slice; it is per-sample either way.
+                   THE LIMIT, measured (res_sweep_prep.py smoke 4/4, dropout row):
+                   dropout draws its mask PER FORWARD, so ACCUM=k draws k masks where
+                   ACCUM=1 drew one. At the shipped dropout=0.1 the gradients then differ
+                   by O(1) relative (2.96e-01) -- same distribution, different draw. The
+                   exactness above is exact at dropout=0 and a matched-distribution
+                   resample otherwise. Set CFG_DROPOUT=0 if arms must be bit-comparable.
                    Exists for the resolution sweep: 32768-point clouds do not fit 16 ears
                    of KPConv on 48 GB, and shrinking `bs` instead would change the
                    optimisation and confound the very comparison the sweep is making.

@@ -46,12 +46,14 @@
 #
 #   CFG_KMAX = 96 / 192 / 384. Still exactly proportional to N, so it is the same
 #   millimetre rescaling as everything else, but anchored on the MEASURED worst ball over
-#   40 / 40 / 20 real ears -- 54 / 127 / 252 at training density, 59 / 126 / 257 at
-#   evaluation density -- times the 1.235 density factor a -10% aug_scale adds, times 1.05
-#   for ears not sampled, leaving a 1.37 / 1.16 / 1.17 margin. Verified on real ears:
-#   frac_truncated prints 0.000 at EVERY level at 8192 and 16384 (audit re-run with these
-#   caps). Expect the same at 32768; if the audit in $WORK/<tag>.log says otherwise, stop
-#   and re-run MODE=ladder.
+#   40 / 40 / 20 real ears. At the CORRECTED V0 (1.067/0.754/0.533 -- see arm_env) the
+#   voxels are 2.7% finer and the deep levels correspondingly denser, so the worst ball
+#   is 59 / 133 / 264 at training density and 60 / 140 / 274 at evaluation density.
+#   Against the 1.235 density factor a -10% aug_scale adds and 1.05 for ears not
+#   sampled, that leaves a 1.29 / 1.06 / 1.08 margin -- thin at the two upper arms but
+#   positive, and the audit run on real ears at all three arms prints frac_truncated
+#   0.000 at EVERY level. The run's own audit is in $WORK/<tag>.log: if it says anything
+#   other than 0.000, stop and re-run MODE=ladder rather than reading the result.
 #
 # It is not free: kpconv memory and step time are both linear in KMAX, so this is a ~2.1x
 # tax on every kpconv arm relative to the auto cap. It is paid equally by all three, so it
@@ -77,7 +79,7 @@
 #
 # WHAT MOVES, AND ONLY BECAUSE THE MILLIMETRES DEMAND IT
 #     kpconv   V0 = the MEASURED grid-equivalent spacing (a property of the data, not a
-#              knob). KMAX is then set BY HAND to 80/160/320 rather than left to the
+#              knob). KMAX is then set BY HAND to 96/192/384 rather than left to the
 #              auto rule, for the reason given above; it is still exactly ~N.
 #              HEAD_K 48 -> 96 -> 192 holds the 4.29mm head window.
 #              NB_CHUNK only caps a transient; it changes no result.
@@ -130,11 +132,20 @@
 # The 32768 kpconv row is the least trustworthy number here: three repeated probes gave
 # 3.40, 4.60 and 5.16 GiB, i.e. the CPU RSS proxy has ~+-30% spread at that size.
 # Every family here is LayerNorm-only, and train_family builds and AUGMENTS the whole
-# batch and slices only the forward, so ACCUM changes neither the gradient nor the random
-# stream: res_sweep_prep.py's smoke checks the gradient entry-wise (4.3e-07 relative),
-# checks that dropping the per-slice reweight breaks it (3.5e-01), and runs the trainer
-# end to end at ACCUM=1 and ACCUM=4 for an identical val MLE (delta 0.0e+00 mm).
-# Shrinking bs instead would change the optimisation and confound the comparison.
+# batch and slices only the forward, so ACCUM leaves the gradient and the AUGMENTATION
+# stream alone: res_sweep_prep.py's smoke checks the gradient entry-wise (4.3e-07
+# relative at dropout=0), checks that dropping the per-slice reweight breaks it
+# (3.5e-01), and runs the trainer end to end at ACCUM=1 and ACCUM=4 for an identical val
+# MLE (delta 0.0e+00 mm). Shrinking bs instead would change the optimisation.
+#
+# THE ONE THING ACCUM DOES CHANGE, measured (smoke 4/4, dropout row): DROPOUT masks are
+# drawn per slice, so at the shipped dropout=0.1 the ACCUM=4 gradient differs from the
+# ACCUM=1 one by O(1) relative -- a different realisation of the same distribution, not
+# a bias. Only kpconv-32768 runs ACCUM>1, so exactly one of the six cells carries an
+# extra seed-sized nuisance on top of the seed noise every cell already has. That is
+# inside the >=0.08mm read-out threshold below, but it is NOT the "byte-identical run"
+# the rest of this paragraph would otherwise imply. Set CFG_DROPOUT=0 on every arm if
+# you need the arms bit-comparable.
 #
 # THOSE ARE CPU-RSS PROXY NUMBERS, NOT CUDA. PREFLIGHT 1 below re-measures them with
 # torch.cuda.max_memory_allocated on the box before anything trains. Trust that, not this.
@@ -187,10 +198,17 @@ PROBE_EPOCHS=${PROBE_EPOCHS:-12}
 
 # ---- per-arm parameters. Everything here is DERIVED, not tuned; see the header.
 arm_env() {                       # $1 = family, $2 = N   ->  echoes the env assignments
+  # S was first measured over EARS=8 and came out 1.096 / 0.774 / 0.547. The crop area is
+  # an ear property spanning 8000..10418 mm^2, so 8 ears leave a 1.4% standard error and
+  # that particular subset sits 2.7% high: 24 and 64 ears both give 1.067 / 0.754 / 0.533,
+  # and build_hires_data's own triangulated crop area (median 9416 mm^2) agrees. The bias
+  # was IDENTICAL at all three arms (+2.68/+2.64/+2.66%), so it never touched the
+  # comparison -- only the absolute millimetre label. Corrected here, and the neighbour
+  # audit re-run at these values prints frac_truncated 0.000 at every level of every arm.
   case "$2" in
-    8192)  S=1.096;  HK=48;  CH=1024; KMAX=96;  PATCH=256;  POOLR=2; KACC=1; PACC=1 ;;
-    16384) S=0.774;  HK=96;  CH=512;  KMAX=192; PATCH=512;  POOLR=4; KACC=1; PACC=1 ;;
-    32768) S=0.547;  HK=192; CH=256;  KMAX=384; PATCH=1024; POOLR=8; KACC=4; PACC=1 ;;
+    8192)  S=1.067;  HK=48;  CH=1024; KMAX=96;  PATCH=256;  POOLR=2; KACC=1; PACC=1 ;;
+    16384) S=0.754;  HK=96;  CH=512;  KMAX=192; PATCH=512;  POOLR=4; KACC=1; PACC=1 ;;
+    32768) S=0.533;  HK=192; CH=256;  KMAX=384; PATCH=1024; POOLR=8; KACC=4; PACC=1 ;;
     *) echo "unknown arm $2" >&2; return 1 ;;
   esac
   if [ "$1" = kpconv ]; then
@@ -201,6 +219,23 @@ arm_env() {                       # $1 = family, $2 = N   ->  echoes the env ass
 }
 
 data_for() { echo "$WORK/screen_data_$1nrm.npz"; }
+
+# The box is FLAT: every other run_*.sh here calls `python3 -u train_family.py` from
+# $EAR, i.e. uploads land in /home/ubuntu/ear/ with no research/code/ tree. Hard-coding
+# research/code/res_sweep_prep.py made BOTH preflight-1 probes die with "can't open
+# file", and the `|| echo FAILED (OOM?)` below would have reported that as an OOM --
+# the exact opposite of what it means. Resolve it, and refuse to start if it is absent
+# rather than let the preflight silently degrade into six fake OOMs.
+PREP=${PREP:-}
+if [ -z "$PREP" ]; then
+  for p in res_sweep_prep.py research/code/res_sweep_prep.py; do
+    [ -f "$p" ] && { PREP=$p; break; }
+  done
+fi
+[ -n "$PREP" ] && [ -f "$PREP" ] || {
+  echo "res_sweep_prep.py not found under $(pwd) -- upload it (PREP=<path> overrides)" >&2
+  exit 1
+}
 
 for N in $ARMS; do
   D=$(data_for "$N")
@@ -224,9 +259,9 @@ if [ "$PREFLIGHT" = 1 ]; then
         CJ="{\"npts\":$N,\"patch\":$CFG_PATCH,\"k\":$CFG_K,\"poolr\":$CFG_POOLR,\"voxel\":0.85,\"voxgrow\":2.5,\"use_nrm\":1}"
       fi
       MODE=mem FAM=$F N=$N B=$MB SUBFRAC=0.625 NOGRAD=0 CFG_JSON="$CJ" \
-        python3 -u research/code/res_sweep_prep.py || echo "  ^^ $F $N B=$MB FAILED (OOM?)"
+        python3 -u "$PREP" || echo "  ^^ $F $N B=$MB FAILED (OOM?)"
       MODE=mem FAM=$F N=$N B=1 SUBFRAC=1.0 NOGRAD=1 CFG_JSON="$CJ" \
-        python3 -u research/code/res_sweep_prep.py || echo "  ^^ $F $N eval FAILED"
+        python3 -u "$PREP" || echo "  ^^ $F $N eval FAILED"
     done
   done
 
