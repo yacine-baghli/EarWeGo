@@ -121,7 +121,7 @@ asserted here that no validation ear's residual is finite.
 
 INFERENCE.  The crop depends on the prediction, so at test time this script must run
 AGAIN on the LOCKBOX ears with PRED pointing at that stage's output. It is local mesh
-work either way. Cost is 2.9 s/ear single-process (measured), so 340 ears is ~16 min.
+work either way. Measured: 340 ears in 12.9 min wall = 2.3 s/ear single-process.
 
 OUTPUT (LIMIT>0 appends _lim<LIMIT> so a smoke run never clobbers the real artefact)
   scratch/local_crops.npz        pts/nrm (E,85,N,3) f16 LOCAL frame; centre (E,85,3) and

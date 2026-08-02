@@ -11,11 +11,15 @@ point spacing, and emits 85 landmarks. This one sees 85 separate patches at a me
 compete with the global stage, it composes with it: `pred = centre + residual`, and
 `centre` is the existing pipeline's own output. Turning it off (residual = 0) reproduces
 the 1.1776 mm baseline exactly, which is the property that makes it safe to ship.
-VERIFIED END TO END on the real artefact and the real split: FAMILY=local FOLD=0 for one
-epoch scores 1.2080 mm on fold 0's 68 validation ears, against the ensemble's own
-1.1872 mm on exactly those ears. The 0.021 mm gap is the heatmap head's initialisation
-drift (mean move 0.17 mm, see the prior table in the constructor), not a frame, ear-order
-or pipeline mismatch -- a mismatch of any of those lands at 3-20 mm.
+VERIFIED END TO END on the real artefact and the real split, two runs, both reproducible:
+  FAMILY=local FOLD=0 EPOCHS=1 TTA=1 FULL_EVAL=0 CFG_LM_PER_STEP=16 CFG_BS=8
+      -> raw MLE 1.2066 mm on fold 0's 68 validation ears (baseline 1.1872 on those ears)
+  ... CFG_HEAD=offset CFG_LR=0.0        -> raw MLE 1.1872 mm, EXACTLY the baseline.
+The second is the decisive one: an identity refiner driven through the whole harness --
+crop artefact, BATCH hook, forward, canonical->world, evaluate -- reproduces the ensemble
+to 4 decimals, so ear order, local frame and composition are all correct. The 0.019 mm in
+the first is the heatmap head's initialisation drift (mean move 0.17 mm, see the prior
+table in the constructor); a frame, ear-order or pipeline mismatch lands at 3-20 mm.
 
 INPUT CONTRACT, and how the current estimate enters
 ---------------------------------------------------
@@ -105,17 +109,21 @@ honest estimate is NOT 85x, but it is not free either.
   arithmetic for this family at width 64, N=1024, all 85 landmarks per step:
       ~26 kFLOP/point forward -> 2.2 GFLOP/ear -> 0.61 TFLOP/epoch forward,
       ~1.8 TFLOP/epoch with the backward pass.
-  ESTIMATE (NOT MEASURED ON GPU): 8-20 s/epoch at lm_per_step=0, i.e. 2-4x kpconv, so
-  1200 epochs is 3-7 h per fold-seed and a 5-fold 2-seed sweep is 33-67 h. Too much.
-  CFG_LM_PER_STEP is the lever: sample K of the 85 landmarks per training step (default
-  16). The weights are shared, so this is ordinary SGD over the landmark axis, not a
-  restriction of the model; it cuts the per-epoch cost by 85/K = 5.3x to an estimated
-  2-4 s/epoch, which is baseline-comparable. Evaluation always uses all 85.
-  ANCHOR, measured: one real fold-0 epoch (272 training ears, bs=4, lm_per_step=4) takes
-  40 s on 8 CPU threads, so lm_per_step=16 is ~160 s/epoch on CPU. A dense shared MLP of
-  this shape typically runs 30-100x faster on an A6000, which brackets 1.6-5.3 s/epoch
-  and is consistent with the FLOP arithmetic above. It is still an extrapolation: NOTHING
-  IN THIS FAMILY HAS BEEN TIMED ON THE GPU BOX.
+  MEASURED, real fold-0 epochs through train_family.py on 272 training ears, bs=8, 8 CPU
+  threads (differencing a 3-epoch run against a 1-epoch run, so the data load and the
+  evaluations cancel):
+      lm_per_step=16   10.5 s/epoch          lm_per_step=0 (all 85)   74.5 s/epoch
+  The ratio is 7.1x, not 85/16 = 5.3x, because BATCH gathers all 85 patches whatever K is;
+  that gather is the fixed floor. An earlier draft of this docstring quoted 160 s/epoch at
+  K=16 by scaling a bs=4/K=4 timing linearly in K -- wrong by 15x, and it is the
+  measurement above that stands.
+  CFG_LM_PER_STEP is still the lever: sample K of the 85 landmarks per training step
+  (default 16). The weights are shared, so this is ordinary SGD over the landmark axis,
+  not a restriction of the model. Evaluation always uses all 85.
+  NOTHING IN THIS FAMILY HAS BEEN TIMED ON THE GPU BOX. But CPU is the pessimistic bound
+  and even a 10x speedup puts K=85 at 7.5 s/epoch and K=16 at 1.1 s/epoch, i.e. between
+  dgcnn (2.01) and kpconv (5.14) rather than 2-4x above them. A 5-fold 2-seed 1200-epoch
+  sweep is therefore hours, not the 33-67 h an earlier draft feared.
   The cost of the lm_per_step trade is more epochs to reach the same number of
   landmark-gradient-steps; treat EPOCHS as needing to rise, not stay at 1200.
 
@@ -316,7 +324,12 @@ class LocalRefiner(nn.Module):
         nh = len(CONTOURS) if self.per_contour else 1
         self.score = nn.ModuleList([nn.Linear(w, 1) for _ in range(nh)])
         self.off = nn.ModuleList([nn.Linear(w, 3) for _ in range(nh)])
-        for m in list(self.score) + list(self.off):     # start as the identity refiner
+        # Start as the identity refiner. MEASURED consequence at step 1 with head=heatmap:
+        # only score.weight (64 params) and log_sigma receive gradient -- enc, mix and the
+        # embedding get exactly 0.0, because dL/dh is score.weight^T * (...) = 0. It
+        # unblocks after one optimiser step. score.bias is permanently dead (softmax is
+        # shift-invariant); harmless, 1 parameter.
+        for m in list(self.score) + list(self.off):
             nn.init.zeros_(m.weight); nn.init.zeros_(m.bias)
 
     def embed(self, ids):
