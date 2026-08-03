@@ -166,12 +166,24 @@ for arm in ARMS:
     if len(seeds_done) >= 2:
         Pe = np.mean([assemble(lambda sd, f, a=arm, s=s: find(a, s, f), s)[0]
                       for s in seeds_done], 0)
-        d, ci, p, v = paired(BASE_ENS, Pe)
+        # SEED-MATCHED: the mse side must use the SAME seeds. Averaging 2 arm seeds against
+        # a 3-seed mse ensemble measures how many seeds each side had, not the objective --
+        # it reported dist as +0.0012 when the matched comparison is -0.0089. This is the
+        # mirror of the single-seed-vs-3-seed error already fixed above; both directions of
+        # the mistake are easy and both were made.
+        matched = [s for s in seeds_done if s in BASE]
+        MB = np.mean([BASE[s] for s in matched], 0)
+        d, ci, p, v = paired(MB, Pe)
         out["arms"][arm]["seed_ensembled"] = {
-            "n_seeds": len(seeds_done), "mle_mm": round(mle(Pe), 4),
-            "delta_vs_mse_ensemble_mm": d, "ci95": ci, "p_negative": p, "verdict": v}
-        print(f"\n{arm} {len(seeds_done)}-seed ensemble: {mle(Pe):.4f} mm  vs mse "
-              f"{mle(BASE_ENS):.4f}  delta {d:+.4f}  CI {ci}  {v}")
+            "n_seeds": len(seeds_done), "seeds": matched, "mle_mm": round(mle(Pe), 4),
+            "mse_same_seeds_mm": round(mle(MB), 4),
+            "delta_vs_mse_same_seeds_mm": d, "ci95": ci, "p_negative": p, "verdict": v,
+            "mse_all_seed_ensemble_mm": round(mle(BASE_ENS), 4)}
+        print(f"\n{arm} {len(seeds_done)}-seed ensemble (seeds {matched}): {mle(Pe):.4f} mm"
+              f"  vs mse same seeds {mle(MB):.4f}  delta {d:+.4f}  CI {ci}  {v}")
+        if len(matched) < len(BASE):
+            print(f"    (mse {len(BASE)}-seed ensemble is {mle(BASE_ENS):.4f}; NOT the "
+                  f"comparison -- different seed counts)")
 
 full = {a: v for a, v in out["arms"].items() if "seed_ensembled" in v or "seed0" in v}
 if not full:
@@ -187,9 +199,9 @@ else:
 
     best = min(full, key=lambda a: score_of(full[a]))
     rec = full[best].get("seed_ensembled") or full[best]["seed0"]
-    if "delta_vs_mse_ensemble_mm" in rec:      # seed-ensembled arm vs seed-ensembled mse
-        dv, vv = rec["delta_vs_mse_ensemble_mm"], rec["verdict"]
-        anchor = f"the mse {len(BASE)}-seed ensemble"
+    if "delta_vs_mse_same_seeds_mm" in rec:   # seed-MATCHED ensemble comparison
+        dv, vv = rec["delta_vs_mse_same_seeds_mm"], rec["verdict"]
+        anchor = f"the mse ensemble over the SAME seeds {rec['seeds']}"
     else:
         # A ONE-SEED arm must not be compared against a THREE-SEED ensemble: that measures
         # seed-ensembling, not the loss. The seed-matched row is the only fair one here.
@@ -201,10 +213,12 @@ else:
     out["best_arm"] = best
     out["headline_anchor"] = anchor
     out["fair_comparison_note"] = (
-        "A single-seed arm is compared against the mse arm at the SAME seed. Comparing it "
-        "against the 3-seed mse ensemble (which this file also reports) measures "
-        "seed-ensembling, not the objective, and would show the arm losing by +0.0286mm "
-        "purely because it has one seed against three.")
+        "Every headline comparison is SEED MATCHED. Mismatching the seed count measures "
+        "seed-ensembling rather than the objective, and it misleads in BOTH directions: a "
+        "1-seed dist arm against the 3-seed mse ensemble reads +0.0286mm (arm looks bad), "
+        "while a 2-seed dist ensemble against the 3-seed mse ensemble reads +0.0012mm when "
+        "the matched 2-vs-2 comparison is -0.0089mm (arm looks neutral instead of ahead). "
+        "Both errors were made in this file before being fixed.")
     out["conclusion"] = (
         f"Best arm {best} at {score_of(full[best])} mm, {dv:+} vs {anchor}. " + (
             "Training against the metric rather than its square is a real gain, and it is "

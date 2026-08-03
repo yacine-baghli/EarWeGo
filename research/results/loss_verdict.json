@@ -60,31 +60,50 @@
      "verdict": "INDISTINGUISHABLE"
     }
    },
-   "seed1_partial": {
-    "folds_done": [
-     0,
-     1,
-     2,
-     3
+   "seed1": {
+    "pooled_oof_mm": 1.2676,
+    "per_fold_mm": [
+     1.2977,
+     1.2029,
+     1.3364,
+     1.2006,
+     1.3004
     ],
-    "per_fold_mm": {
-     "0": 1.2977,
-     "1": 1.2029,
-     "2": 1.3364,
-     "3": 1.2006
+    "vs_mse_seed_ensemble": {
+     "delta_mm": 0.0384,
+     "ci95": [
+      0.0216,
+      0.0548
+     ],
+     "p_negative": 0.0,
+     "verdict": "HARMFUL"
     },
-    "baseline_seed_mean_mm": {
-     "0": 1.2652,
-     "1": 1.2504,
-     "2": 1.3179,
-     "3": 1.2124
-    },
-    "per_fold_delta_mm": {
-     "0": 0.0325,
-     "1": -0.0475,
-     "2": 0.0185,
-     "3": -0.0118
+    "vs_mse_same_seed": {
+     "delta_mm": -0.0052,
+     "ci95": [
+      -0.0252,
+      0.0147
+     ],
+     "p_negative": 0.6982,
+     "verdict": "INDISTINGUISHABLE"
     }
+   },
+   "seed_ensembled": {
+    "n_seeds": 2,
+    "seeds": [
+     0,
+     1
+    ],
+    "mle_mm": 1.2304,
+    "mse_same_seeds_mm": 1.2393,
+    "delta_vs_mse_same_seeds_mm": -0.0089,
+    "ci95": [
+     -0.0222,
+     0.0043
+    ],
+    "p_negative": 0.9078,
+    "verdict": "INDISTINGUISHABLE",
+    "mse_all_seed_ensemble_mm": 1.2292
    }
   },
   "phuber": {
@@ -118,14 +137,12 @@
    }
   }
  },
- "partial": [
-  "dist seed 1: 4/5 folds"
- ],
+ "partial": [],
  "verdict": "INDISTINGUISHABLE",
- "best_arm": "phuber",
- "headline_anchor": "the mse arm at the SAME seed",
- "fair_comparison_note": "A single-seed arm is compared against the mse arm at the SAME seed. Comparing it against the 3-seed mse ensemble (which this file also reports) measures seed-ensembling, not the objective, and would show the arm losing by +0.0286mm purely because it has one seed against three.",
- "conclusion": "Best arm phuber at 1.2559 mm, -0.0126 vs the mse arm at the SAME seed. The objective mismatch is real in the distribution but does not pay in millimetres. Combined with metric_alignment.py, the mean/median gap is closed both post hoc and at training time.",
+ "best_arm": "dist",
+ "headline_anchor": "the mse ensemble over the SAME seeds [0, 1]",
+ "fair_comparison_note": "Every headline comparison is SEED MATCHED. Mismatching the seed count measures seed-ensembling rather than the objective, and it misleads in BOTH directions: a 1-seed dist arm against the 3-seed mse ensemble reads +0.0286mm (arm looks bad), while a 2-seed dist ensemble against the 3-seed mse ensemble reads +0.0012mm when the matched 2-vs-2 comparison is -0.0089mm (arm looks neutral instead of ahead). Both errors were made in this file before being fixed.",
+ "conclusion": "Best arm dist at 1.2304 mm, -0.0089 vs the mse ensemble over the SAME seeds [0, 1]. The objective mismatch is real in the distribution but does not pay in millimetres. Combined with metric_alignment.py, the mean/median gap is closed both post hoc and at training time.",
  "caveats": [
   "Raw-network OOF: no TTA, no surface projection, no dense-SSM blend. Comparable to the 1.2292mm mse baseline row, NOT to the 1.1776mm shipped figure.",
   "A 5-fold x 1-seed arm is a screen. It pools all 340 ears so it is not one-fold screening, but it is under-powered on the SEED axis; the baseline's per-fold seed sd is reported so the delta can be read against it.",
