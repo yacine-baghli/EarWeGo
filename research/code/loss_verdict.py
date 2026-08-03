@@ -180,16 +180,33 @@ if not full:
                          "above are compared against the baseline's SEED MEAN, which is "
                          "the right anchor while the new arm has only one seed.")
 else:
-    best = min(full, key=lambda a: (full[a].get("seed_ensembled") or full[a]["seed0"])
-               .get("mle_mm", 9e9))
+    def score_of(v):
+        """A seed-ensembled record stores mle_mm; a single-seed record pooled_oof_mm."""
+        r = v.get("seed_ensembled") or v.get("seed0") or {}
+        return r.get("mle_mm", r.get("pooled_oof_mm", 9e9))
+
+    best = min(full, key=lambda a: score_of(full[a]))
     rec = full[best].get("seed_ensembled") or full[best]["seed0"]
-    dk = "delta_vs_mse_ensemble_mm" if "delta_vs_mse_ensemble_mm" in rec else None
-    dv = rec[dk] if dk else rec["vs_mse_seed_ensemble"]["delta_mm"]
-    vv = rec["verdict"] if "verdict" in rec else rec["vs_mse_seed_ensemble"]["verdict"]
+    if "delta_vs_mse_ensemble_mm" in rec:      # seed-ensembled arm vs seed-ensembled mse
+        dv, vv = rec["delta_vs_mse_ensemble_mm"], rec["verdict"]
+        anchor = f"the mse {len(BASE)}-seed ensemble"
+    else:
+        # A ONE-SEED arm must not be compared against a THREE-SEED ensemble: that measures
+        # seed-ensembling, not the loss. The seed-matched row is the only fair one here.
+        sm = rec.get("vs_mse_same_seed") or rec["vs_mse_seed_ensemble"]
+        dv, vv = sm["delta_mm"], sm["verdict"]
+        anchor = ("the mse arm at the SAME seed" if "vs_mse_same_seed" in rec
+                  else f"the mse {len(BASE)}-seed ensemble")
     out["verdict"] = vv
     out["best_arm"] = best
+    out["headline_anchor"] = anchor
+    out["fair_comparison_note"] = (
+        "A single-seed arm is compared against the mse arm at the SAME seed. Comparing it "
+        "against the 3-seed mse ensemble (which this file also reports) measures "
+        "seed-ensembling, not the objective, and would show the arm losing by +0.0286mm "
+        "purely because it has one seed against three.")
     out["conclusion"] = (
-        f"Best arm {best} at {rec['mle_mm']} mm, {dv:+} vs the mse seed ensemble. " + (
+        f"Best arm {best} at {score_of(full[best])} mm, {dv:+} vs {anchor}. " + (
             "Training against the metric rather than its square is a real gain, and it is "
             "architecture-independent -- the same change should be tried on kpconv and "
             "ptv3, where a correlated improvement in every ensemble member compounds."

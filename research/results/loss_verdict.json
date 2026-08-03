@@ -32,31 +32,42 @@
  },
  "arms": {
   "dist": {
-   "seed0_partial": {
-    "folds_done": [
-     0,
-     1
+   "seed0": {
+    "pooled_oof_mm": 1.2578,
+    "per_fold_mm": [
+     1.256,
+     1.2406,
+     1.322,
+     1.1882,
+     1.2823
     ],
-    "per_fold_mm": {
-     "0": 1.256,
-     "1": 1.2406
+    "vs_mse_seed_ensemble": {
+     "delta_mm": 0.0286,
+     "ci95": [
+      0.0137,
+      0.0437
+     ],
+     "p_negative": 0.0001,
+     "verdict": "HARMFUL"
     },
-    "baseline_seed_mean_mm": {
-     "0": 1.2652,
-     "1": 1.2504
-    },
-    "per_fold_delta_mm": {
-     "0": -0.0092,
-     "1": -0.0098
+    "vs_mse_same_seed": {
+     "delta_mm": -0.0107,
+     "ci95": [
+      -0.0277,
+      0.0061
+     ],
+     "p_negative": 0.8948,
+     "verdict": "INDISTINGUISHABLE"
     }
    }
   }
  },
- "partial": [
-  "dist seed 0: 2/5 folds"
- ],
- "verdict": "INCOMPLETE",
- "conclusion": "No arm has a complete 5-fold pooled OOF yet. Per-fold partials above are compared against the baseline's SEED MEAN, which is the right anchor while the new arm has only one seed.",
+ "partial": [],
+ "verdict": "INDISTINGUISHABLE",
+ "best_arm": "dist",
+ "headline_anchor": "the mse arm at the SAME seed",
+ "fair_comparison_note": "A single-seed arm is compared against the mse arm at the SAME seed. Comparing it against the 3-seed mse ensemble (which this file also reports) measures seed-ensembling, not the objective, and would show the arm losing by +0.0286mm purely because it has one seed against three.",
+ "conclusion": "Best arm dist at 1.2578 mm, -0.0107 vs the mse arm at the SAME seed. The objective mismatch is real in the distribution but does not pay in millimetres. Combined with metric_alignment.py, the mean/median gap is closed both post hoc and at training time.",
  "caveats": [
   "Raw-network OOF: no TTA, no surface projection, no dense-SSM blend. Comparable to the 1.2292mm mse baseline row, NOT to the 1.1776mm shipped figure.",
   "A 5-fold x 1-seed arm is a screen. It pools all 340 ears so it is not one-fold screening, but it is under-powered on the SEED axis; the baseline's per-fold seed sd is reported so the delta can be read against it.",
