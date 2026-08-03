@@ -424,8 +424,48 @@ def default_loss(out, tg, model=None, batch=None):
     if aux:
         w = np.array([0.5 ** (len(aux) - 1 - t) for t in range(len(aux))]); w /= w.sum()
         for t, a in enumerate(aux):
-            L = L + float(w[t]) * ((a - tg) ** 2).sum(-1).mean()
-    return L + ((out["pred"] - tg) ** 2).sum(-1).mean() + out.get("reg", 0.0)
+            L = L + float(w[t]) * _pointloss(a, tg)
+    return L + _pointloss(out["pred"], tg) + out.get("reg", 0.0)
+
+
+LOSSFN = os.environ.get("LOSSFN", "mse")
+PH_DELTA = float(os.environ.get("PH_DELTA", "1.0"))
+assert LOSSFN in ("mse", "dist", "phuber"), f"unknown LOSSFN {LOSSFN!r}: mse|dist|phuber"
+
+
+def _pointloss(a, b):
+    """Per-landmark discrepancy for default_loss, meaned over landmarks and batch.
+
+    LOSSFN=mse (the default) is ((a-b)**2).sum(-1).mean() -- BIT-IDENTICAL to the code
+    this replaced, so an unset environment cannot change any existing family's result.
+
+    The alternatives exist because argmin_c E||x-c||^2 is the conditional MEAN while the
+    competition metric is the mean ordered Euclidean DISTANCE, whose minimiser is the
+    conditional geometric MEDIAN. Those differ for a skewed distribution and ours is
+    skewed (pooled mean 1.1827mm, median 0.9305, ratio 1.27). metric_alignment.py showed
+    the gap is not recoverable after training, and the same switch is already in
+    gpu_screen.py; this puts it in the shared trainer so kpconv / ptv3 / any registered
+    family can be run under the same objective. A loss change is architecture-independent,
+    so if it pays on one backbone it should pay on all of them -- and a correlated
+    improvement in every ensemble member is worth more than an improvement in one.
+
+      dist    sqrt(d2 + 1e-8): the metric itself; the epsilon keeps the gradient finite at
+              zero and shifts the loss by 1e-4mm, four orders below the signal.
+      phuber  delta^2 (sqrt(1 + d2/delta^2) - 1): quadratic below delta, linear above, so
+              at delta=1mm it keeps MSE on the already-accurate landmarks and switches to
+              the metric on the heavy right tail where mean and median actually differ.
+
+    A family that defines its OWN loss() is untouched by this -- default_loss returns
+    early in that case, so fam_template / fam_vheat / fam_phase keep their objectives and
+    LOSSFN silently does nothing for them. That is deliberate but worth knowing before
+    reading a LOSSFN arm of a structural family as if the flag had applied.
+    """
+    d2 = ((a - b) ** 2).sum(-1)
+    if LOSSFN == "mse":
+        return d2.mean()
+    if LOSSFN == "dist":
+        return torch.sqrt(d2 + 1e-8).mean()
+    return (PH_DELTA ** 2 * (torch.sqrt(1.0 + d2 / PH_DELTA ** 2) - 1.0)).mean()
 
 
 # ------------------------------------------------------------------ full pipeline
