@@ -232,6 +232,40 @@ else:
             "Training against the metric is WORSE. The likely cause is optimisation, not "
             "the functional: a distance loss has bounded gradients that do not shrink near "
             "convergence, and the LR was deliberately not retuned."))
+
+# ------------------------------------------------------- multiplicity, stated not hidden
+from math import comb  # noqa: E402
+per_seed = [r["vs_mse_same_seed"]["delta_mm"]
+            for a in out["arms"].values() for k, r in a.items()
+            if k.startswith("seed") and "_partial" not in k and "vs_mse_same_seed" in r]
+if per_seed:
+    n = len(per_seed)
+    kneg = sum(1 for v in per_seed if v < 0)
+    sign_p = sum(comb(n, i) for i in range(kneg, n + 1)) / 2 ** n
+    out["pooled_across_arms"] = {
+        "note": ("dist and phuber are not independent tests -- both are sub-quadratic on "
+                 "the tail and succeed or fail for the same reason -- so the honest "
+                 "summary is the pooled sign test over every seed of either arm against "
+                 "mse at that same seed."),
+        "per_seed_deltas_mm": per_seed, "n_runs": n, "n_negative": kneg,
+        "mean_delta_mm": round(sum(per_seed) / n, 4),
+        "sign_test_p_one_sided": round(sign_p, 4)}
+    print(f"\npooled across arms: {kneg}/{n} runs negative, mean "
+          f"{sum(per_seed)/n:+.4f} mm, sign test p = {sign_p:.4f}")
+
+adopt_marginal = [k for k, v in out["arms"].items()
+                  for kk, r in v.items() if kk == "seed_ensembled"
+                  and r.get("verdict") == "ADOPT" and r["ci95"][1] > -0.005]
+out["multiplicity_caveat"] = (
+    "THE PER-ARM VERDICTS ABOVE ARE NOMINAL AND NOT MULTIPLICITY-CORRECTED. Two arms were "
+    "run and each was inspected at 1, 2 and 3 seeds, so at least six tests were performed "
+    "on the same hypothesis. Any verdict that flips to ADOPT on a barely-excluded interval "
+    "is optional stopping: the nominal p-value does not hold under a procedure that looks "
+    "repeatedly and stops at the first crossing. "
+    + (f"Currently marginal: {adopt_marginal} (CI upper bound within 0.005mm of zero). "
+       if adopt_marginal else "")
+    + "Treat the pooled sign test as the summary and require a pre-registered confirmation "
+      "run before adopting any single arm.")
 out["caveats"] = [
     "Raw-network OOF: no TTA, no surface projection, no dense-SSM blend. Comparable to the "
     "1.2292mm mse baseline row, NOT to the 1.1776mm shipped figure.",
