@@ -192,21 +192,50 @@
      "verdict": "INDISTINGUISHABLE"
     }
    },
+   "seed2": {
+    "pooled_oof_mm": 1.2691,
+    "per_fold_mm": [
+     1.2872,
+     1.2348,
+     1.3278,
+     1.1942,
+     1.3013
+    ],
+    "vs_mse_seed_ensemble": {
+     "delta_mm": 0.0399,
+     "ci95": [
+      0.0236,
+      0.0561
+     ],
+     "p_negative": 0.0,
+     "verdict": "HARMFUL"
+    },
+    "vs_mse_same_seed": {
+     "delta_mm": 0.0016,
+     "ci95": [
+      -0.0162,
+      0.0191
+     ],
+     "p_negative": 0.4341,
+     "verdict": "INDISTINGUISHABLE"
+    }
+   },
    "seed_ensembled": {
-    "n_seeds": 2,
+    "n_seeds": 3,
     "seeds": [
      0,
-     1
+     1,
+     2
     ],
-    "mle_mm": 1.2259,
-    "mse_same_seeds_mm": 1.2393,
-    "delta_vs_mse_same_seeds_mm": -0.0135,
+    "mle_mm": 1.2212,
+    "mse_same_seeds_mm": 1.2292,
+    "delta_vs_mse_same_seeds_mm": -0.008,
     "ci95": [
-     -0.027,
-     -0.0002
+     -0.0186,
+     0.0026
     ],
-    "p_negative": 0.9758,
-    "verdict": "ADOPT",
+    "p_negative": 0.9318,
+    "verdict": "INDISTINGUISHABLE",
     "mse_all_seed_ensemble_mm": 1.2292
    }
   }
@@ -224,14 +253,15 @@
    -0.0052,
    -0.0051,
    -0.0126,
-   -0.0145
+   -0.0145,
+   0.0016
   ],
-  "n_runs": 5,
+  "n_runs": 6,
   "n_negative": 5,
-  "mean_delta_mm": -0.0096,
-  "sign_test_p_one_sided": 0.0312
+  "mean_delta_mm": -0.0077,
+  "sign_test_p_one_sided": 0.1094
  },
- "multiplicity_caveat": "THE PER-ARM VERDICTS ABOVE ARE NOMINAL AND NOT MULTIPLICITY-CORRECTED. Two arms were run and each was inspected at 1, 2 and 3 seeds, so at least six tests were performed on the same hypothesis. Any verdict that flips to ADOPT on a barely-excluded interval is optional stopping: the nominal p-value does not hold under a procedure that looks repeatedly and stops at the first crossing. Currently marginal: ['phuber'] (CI upper bound within 0.005mm of zero). Treat the pooled sign test as the summary and require a pre-registered confirmation run before adopting any single arm.",
+ "multiplicity_caveat": "THE PER-ARM VERDICTS ABOVE ARE NOMINAL AND NOT MULTIPLICITY-CORRECTED. Two arms were run and each was inspected at 1, 2 and 3 seeds, so at least six tests were performed on the same hypothesis. Any verdict that flips to ADOPT on a barely-excluded interval is optional stopping: the nominal p-value does not hold under a procedure that looks repeatedly and stops at the first crossing. Treat the pooled sign test as the summary and require a pre-registered confirmation run before adopting any single arm.",
  "caveats": [
   "Raw-network OOF: no TTA, no surface projection, no dense-SSM blend. Comparable to the 1.2292mm mse baseline row, NOT to the 1.1776mm shipped figure.",
   "A 5-fold x 1-seed arm is a screen. It pools all 340 ears so it is not one-fold screening, but it is under-powered on the SEED axis; the baseline's per-fold seed sd is reported so the delta can be read against it.",
