@@ -1,0 +1,66 @@
+{
+ "question": "does training against the metric beat training against its square?",
+ "control": "VARIANT, data, LR, epochs and deep-supervision weights all identical; LOSSFN is the only difference, and LOSSFN=mse is bit-identical to the shipped objective",
+ "n_ears": 340,
+ "n_bootstrap": 20000,
+ "mse_baseline": {
+  "seeds": [
+   0,
+   1,
+   2
+  ],
+  "per_seed_pooled_mm": [
+   1.2685,
+   1.2728,
+   1.2675
+  ],
+  "seed_ensemble_mm": 1.2292,
+  "per_fold_seed_mean_mm": [
+   1.2652,
+   1.2504,
+   1.3179,
+   1.2124,
+   1.3022
+  ],
+  "per_fold_seed_sd_mm": [
+   0.0128,
+   0.013,
+   0.0133,
+   0.0287,
+   0.0051
+  ]
+ },
+ "arms": {
+  "dist": {
+   "seed0_partial": {
+    "folds_done": [
+     0,
+     1
+    ],
+    "per_fold_mm": {
+     "0": 1.256,
+     "1": 1.2406
+    },
+    "baseline_seed_mean_mm": {
+     "0": 1.2652,
+     "1": 1.2504
+    },
+    "per_fold_delta_mm": {
+     "0": -0.0092,
+     "1": -0.0098
+    }
+   }
+  }
+ },
+ "partial": [
+  "dist seed 0: 2/5 folds"
+ ],
+ "verdict": "INCOMPLETE",
+ "conclusion": "No arm has a complete 5-fold pooled OOF yet. Per-fold partials above are compared against the baseline's SEED MEAN, which is the right anchor while the new arm has only one seed.",
+ "caveats": [
+  "Raw-network OOF: no TTA, no surface projection, no dense-SSM blend. Comparable to the 1.2292mm mse baseline row, NOT to the 1.1776mm shipped figure.",
+  "A 5-fold x 1-seed arm is a screen. It pools all 340 ears so it is not one-fold screening, but it is under-powered on the SEED axis; the baseline's per-fold seed sd is reported so the delta can be read against it.",
+  "LR and deep-supervision weights were NOT retuned for the new losses, deliberately, so the arm differs in one thing. A harmful result therefore does not separate the functional from its optimisation.",
+  "phuber's delta=1mm was chosen a priori from the pooled median error, not tuned."
+ ]
+}
