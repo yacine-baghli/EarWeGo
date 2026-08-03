@@ -1,0 +1,101 @@
+{
+ "baseline_member_mean_mm": 1.1827,
+ "n_ears": 340,
+ "n_networks": 7,
+ "n_bootstrap": 20000,
+ "why": "argmin E||x-c|| is the geometric median, argmin E||x-c||^2 is the mean; the models train the second and are scored on the first",
+ "tests": {
+  "offset_mean": {
+   "mle_mm": 1.1879,
+   "delta_mm": 0.0052,
+   "ci95": [
+    0.002,
+    0.0083
+   ],
+   "verdict": "HARMFUL",
+   "mean_offset_mm": 0.0958
+  },
+  "offset_geometric_median": {
+   "mle_mm": 1.1862,
+   "delta_mm": 0.0035,
+   "ci95": [
+    0.0013,
+    0.0057
+   ],
+   "verdict": "HARMFUL",
+   "mean_offset_mm": 0.0787
+  },
+  "net_mean_equal7": {
+   "mle_mm": 1.1832,
+   "delta_mm": 0.0005,
+   "ci95": [
+    -0.0013,
+    0.0023
+   ],
+   "verdict": "INDISTINGUISHABLE"
+  },
+  "net_geometric_median": {
+   "mle_mm": 1.1875,
+   "delta_mm": 0.0048,
+   "ci95": [
+    0.0,
+    0.0096
+   ],
+   "verdict": "INDISTINGUISHABLE"
+  },
+  "net_coordinate_median": {
+   "mle_mm": 1.1903,
+   "delta_mm": 0.0076,
+   "ci95": [
+    0.0027,
+    0.0124
+   ],
+   "verdict": "HARMFUL"
+  },
+  "net_trimmed_mean_1": {
+   "mle_mm": 1.1833,
+   "delta_mm": 0.0005,
+   "ci95": [
+    -0.0024,
+    0.0034
+   ],
+   "verdict": "INDISTINGUISHABLE"
+  },
+  "member_geometric_median": {
+   "mle_mm": 1.1878,
+   "delta_mm": 0.0051,
+   "ci95": [
+    0.0007,
+    0.0094
+   ],
+   "verdict": "HARMFUL"
+  },
+  "member_coordinate_median": {
+   "mle_mm": 1.1889,
+   "delta_mm": 0.0062,
+   "ci95": [
+    0.0019,
+    0.0104
+   ],
+   "verdict": "HARMFUL"
+  }
+ },
+ "residual_shape": {
+  "pooled_mean_mm": 1.1827,
+  "pooled_median_mm": 0.9339,
+  "pooled_p90_mm": 2.329,
+  "mean_over_median": 1.2664,
+  "global_residual_vector_mean_mm": 0.0359,
+  "global_residual_vector_geomedian_mm": 0.0198,
+  "per_landmark_bias_mm": 0.0875
+ },
+ "best": "net_mean_equal7",
+ "verdict": "NULL",
+ "conclusion": "Best variant net_mean_equal7 at 1.1832 mm (+0.0005, CI [-0.0013, 0.0023]). The mean/median mismatch is real in the distribution -- pooled mean over median is 1.2664 -- but it is NOT exploitable post hoc. The per-landmark systematic bias is only 0.0875 mm, so there is no constant to remove, and with seven strongly correlated networks the geometric median and the mean are nearly the same point. Fixing this would require training against the distance rather than its square, not re-aggregating what MSE already produced.",
+ "caveats": [
+  "No surface projection anywhere here, so every row is comparable to the 1.1827mm pre-projection ensemble and not to the 1.1776mm shipped figure.",
+  "The geometric median over 7 highly correlated members is close to their mean by construction; a null here does NOT show that a distance-based training loss is null.",
+  "Offsets are fitted on the outer fold's TRAINING ears only; ear- and subject-disjointness is asserted per fold.",
+  "net_mean_equal7 changes the member weighting as well as nothing else, and is reported so the aggregation rows are not read as if weighting were held fixed."
+ ]
+}

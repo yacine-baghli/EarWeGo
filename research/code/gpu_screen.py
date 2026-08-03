@@ -264,6 +264,49 @@ def evaluate(idx, nsample=4):
     return Pw, Gw, var
 
 
+def pointloss(a, b):
+    """Per-landmark discrepancy, meaned over landmarks and batch.
+
+    LOSSFN=mse (default) reproduces the shipped objective EXACTLY -- squared distance
+    summed over xyz -- so an unset environment cannot change any existing result.
+
+    Why the alternatives exist: argmin_c E||x-c||^2 is the conditional MEAN, but the
+    competition metric is the mean ordered Euclidean DISTANCE, whose minimiser is the
+    conditional geometric MEDIAN. Those differ for a skewed distribution, and ours is
+    skewed -- pooled mean 1.1827mm against median 0.9305, ratio 1.27. metric_alignment.py
+    showed the gap is NOT recoverable after the fact (re-aggregating seven correlated
+    networks by geometric median, and per-landmark offsets fitted out of fold, are all
+    null or harmful), which leaves changing the objective as the only way to test it.
+
+      dist    sqrt(d2 + EPS2), the metric itself. EPS2 = 1e-8 mm^2 keeps the gradient
+              finite at zero and moves the loss by 1e-4 mm, four orders below the signal.
+      phuber  delta^2 (sqrt(1 + d2/delta^2) - 1): quadratic for d << delta, linear beyond.
+              At delta = 1mm this keeps MSE's behaviour on the landmarks that are already
+              accurate and switches to the metric on the heavy right tail, which is where
+              mean and median actually part company.
+
+    Gradient scale differs between them, and the learning rate is NOT retuned here: that
+    is deliberate, so the arm differs from the baseline in one thing only. If a distance
+    arm is unstable it should show as a worse training curve, not be hidden by a
+    simultaneous LR change.
+    """
+    d2 = ((a - b) ** 2).sum(-1)
+    if LOSSFN == "mse":
+        return d2.mean()
+    if LOSSFN == "dist":
+        return torch.sqrt(d2 + 1e-8).mean()
+    if LOSSFN == "phuber":
+        return (PH_DELTA ** 2 * (torch.sqrt(1.0 + d2 / PH_DELTA ** 2) - 1.0)).mean()
+    raise SystemExit(f"unknown LOSSFN {LOSSFN!r}: use mse | dist | phuber")
+
+
+LOSSFN = os.environ.get("LOSSFN", "mse")
+PH_DELTA = float(os.environ.get("PH_DELTA", "1.0"))
+assert LOSSFN in ("mse", "dist", "phuber"), f"unknown LOSSFN {LOSSFN!r}"
+if LOSSFN != "mse":
+    print(f"[loss] {LOSSFN}" + (f" delta={PH_DELTA}mm" if LOSSFN == "phuber" else "")
+          + " -- deep-supervision weights and LR unchanged")
+
 best = (9e9, None)
 for ep in range(EPOCHS):
     net.train(); perm = np.random.permutation(tr_idx)
@@ -278,8 +321,8 @@ for ep in range(EPOCHS):
         loss = 0.0
         for t in range(NPASS):
             q1, q2 = outs[t]
-            loss = loss + sup_w[t] * (0.4 * ((q1 - tg) ** 2).sum(-1).mean() + ((q2 - tg) ** 2).sum(-1).mean())
-        loss = loss + ((fin - tg) ** 2).sum(-1).mean()
+            loss = loss + sup_w[t] * (0.4 * pointloss(q1, tg) + pointloss(q2, tg))
+        loss = loss + pointloss(fin, tg)
         if CHAMFER:
             for lo, hi in CONTOURS:
                 A = resample_dense(fin[:, lo:hi+1]); B = resample_dense(tg[:, lo:hi+1])

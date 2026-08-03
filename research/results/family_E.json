@@ -1,0 +1,75 @@
+{
+ "question": "does a subject's other ear carry usable information about this one?",
+ "control": "MODE is the only difference; 995,248 params and identical state_dict keys in both arms",
+ "n_ears": 340,
+ "n_bootstrap": 20000,
+ "arms": {
+  "single": {
+   "seed0": {
+    "pooled_oof_mm": 1.3352,
+    "per_fold_mm": [
+     1.3527,
+     1.3284,
+     1.3726,
+     1.2693,
+     1.353
+    ],
+    "tangent_rmse_mm": 1.4493,
+    "per_contour_mm": {
+     "outer_helix": 1.377,
+     "concha": 1.0793,
+     "inner_helix": 1.622,
+     "sup._antihelix": 1.4247
+    }
+   }
+  },
+  "bilat": {
+   "seed0": {
+    "pooled_oof_mm": 1.3292,
+    "per_fold_mm": [
+     1.3702,
+     1.3015,
+     1.3471,
+     1.2955,
+     1.3318
+    ],
+    "tangent_rmse_mm": 1.4596,
+    "per_contour_mm": {
+     "outer_helix": 1.3653,
+     "concha": 1.0815,
+     "inner_helix": 1.6064,
+     "sup._antihelix": 1.4279
+    }
+   }
+  }
+ },
+ "missing": [
+  "single seed 1: fold 0 missing",
+  "single seed 2: fold 0 missing",
+  "bilat seed 1: fold 0 missing",
+  "bilat seed 2: fold 0 missing"
+ ],
+ "seeds_complete_in_both_arms": [
+  0
+ ],
+ "per_seed_delta": {
+  "seed0": {
+   "delta_mm": -0.006,
+   "ci95": [
+    -0.029,
+    0.0169
+   ],
+   "p_negative": 0.694,
+   "verdict": "INDISTINGUISHABLE"
+  }
+ },
+ "verdict": "INDISTINGUISHABLE",
+ "complete": false,
+ "conclusion": "With 1 of 3 seeds complete in both arms, bilateral minus single is -0.006 mm (CI [-0.029, 0.0169]). Bilateral context is indistinguishable from single-ear at this sample size. Together with context_probe.json's 121 hand-crafted features this closes the 'use the other ear' idea with a like-for-like architecture: the shared per-subject factor is real in the ORACLE corrections but is not recoverable from the observable geometry of either ear. NOT FINAL: 4 run group(s) still in flight; the seed spread below is the scale to read it against.",
+ "caveats": [
+  "This family scores ~1.35mm, weaker than the 1.26mm DGCNN baseline, so a bilateral win here answers the scientific question without necessarily producing a better ensemble member. Porting the context to the strong backbone would be the follow-up.",
+  "The bootstrap resamples SUBJECTS, not ears: the two ears of a subject are not independent, and that dependence is exactly what is under test.",
+  "Raw-network OOF -- no surface projection, no TTA -- so these are not comparable to the 1.1776mm shipped figure.",
+  "In MODE=single the context encoder's is_head input column never fires, so those weights exist and take no gradient. That is the price of a bit-for-bit identical parameter list and is cheaper than a differently-shaped comparison."
+ ]
+}
