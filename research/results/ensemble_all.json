@@ -1,0 +1,285 @@
+{
+ "n_groups": 7,
+ "n_networks": 20,
+ "n_ears": 340,
+ "n_bootstrap": 20000,
+ "ruleD_clusters": {
+  "dup_r": 0.95,
+  "source_of_threshold": "ensemble_oof.py dup_r, predates this file",
+  "clusters": [
+   "dgcnn_mse+dgcnn_dist+dgcnn_phuber",
+   "kpconv",
+   "ptv3",
+   "famE_single+famE_bilat"
+  ]
+ },
+ "reframe": "an ensemble member does not need to BEAT the baseline, only to differ from it; dist and phuber failed replacement tests but are useful members",
+ "groups": {
+  "dgcnn_mse": {
+   "n_nets": 3,
+   "pooled_oof_mm": 1.2292,
+   "per_net_mm": [
+    1.2685,
+    1.2728,
+    1.2675
+   ]
+  },
+  "dgcnn_dist": {
+   "n_nets": 4,
+   "pooled_oof_mm": 1.2138,
+   "per_net_mm": [
+    1.2578,
+    1.2676,
+    1.2624,
+    1.2594
+   ]
+  },
+  "dgcnn_phuber": {
+   "n_nets": 3,
+   "pooled_oof_mm": 1.2212,
+   "per_net_mm": [
+    1.2559,
+    1.2583,
+    1.2691
+   ]
+  },
+  "kpconv": {
+   "n_nets": 2,
+   "pooled_oof_mm": 1.2516,
+   "per_net_mm": [
+    1.2881,
+    1.2833
+   ]
+  },
+  "ptv3": {
+   "n_nets": 2,
+   "pooled_oof_mm": 1.2417,
+   "per_net_mm": [
+    1.2982,
+    1.2837
+   ]
+  },
+  "famE_single": {
+   "n_nets": 3,
+   "pooled_oof_mm": 1.2722,
+   "per_net_mm": [
+    1.3352,
+    1.3113,
+    1.3271
+   ]
+  },
+  "famE_bilat": {
+   "n_nets": 3,
+   "pooled_oof_mm": 1.2774,
+   "per_net_mm": [
+    1.3292,
+    1.3158,
+    1.3196
+   ]
+  }
+ },
+ "diversity": {
+  "signed_tangent_corr_matrix": {
+   "dgcnn_mse": {
+    "dgcnn_mse": 1.0,
+    "dgcnn_dist": 0.971,
+    "dgcnn_phuber": 0.971,
+    "kpconv": 0.887,
+    "ptv3": 0.89,
+    "famE_single": 0.903,
+    "famE_bilat": 0.901
+   },
+   "dgcnn_dist": {
+    "dgcnn_mse": 0.971,
+    "dgcnn_dist": 1.0,
+    "dgcnn_phuber": 0.979,
+    "kpconv": 0.892,
+    "ptv3": 0.897,
+    "famE_single": 0.911,
+    "famE_bilat": 0.908
+   },
+   "dgcnn_phuber": {
+    "dgcnn_mse": 0.971,
+    "dgcnn_dist": 0.979,
+    "dgcnn_phuber": 1.0,
+    "kpconv": 0.889,
+    "ptv3": 0.894,
+    "famE_single": 0.903,
+    "famE_bilat": 0.904
+   },
+   "kpconv": {
+    "dgcnn_mse": 0.887,
+    "dgcnn_dist": 0.892,
+    "dgcnn_phuber": 0.889,
+    "kpconv": 1.0,
+    "ptv3": 0.861,
+    "famE_single": 0.858,
+    "famE_bilat": 0.858
+   },
+   "ptv3": {
+    "dgcnn_mse": 0.89,
+    "dgcnn_dist": 0.897,
+    "dgcnn_phuber": 0.894,
+    "kpconv": 0.861,
+    "ptv3": 1.0,
+    "famE_single": 0.877,
+    "famE_bilat": 0.872
+   },
+   "famE_single": {
+    "dgcnn_mse": 0.903,
+    "dgcnn_dist": 0.911,
+    "dgcnn_phuber": 0.903,
+    "kpconv": 0.858,
+    "ptv3": 0.877,
+    "famE_single": 1.0,
+    "famE_bilat": 0.971
+   },
+   "famE_bilat": {
+    "dgcnn_mse": 0.901,
+    "dgcnn_dist": 0.908,
+    "dgcnn_phuber": 0.904,
+    "kpconv": 0.858,
+    "ptv3": 0.872,
+    "famE_single": 0.971,
+    "famE_bilat": 1.0
+   }
+  },
+  "mean_off_diagonal": 0.905
+ },
+ "rules": {
+  "shipped_3group": {
+   "raw_mm": 1.1827,
+   "projected_mm": 1.1776,
+   "delta_vs_previous_best_mm": 0.0,
+   "ci95": [
+    0.0,
+    0.0
+   ],
+   "p_negative": 0.0,
+   "verdict": "INDISTINGUISHABLE"
+  },
+  "ruleA_group_equal": {
+   "raw_mm": 1.1828,
+   "projected_mm": 1.1744,
+   "delta_vs_previous_best_mm": -0.0033,
+   "ci95": [
+    -0.0112,
+    0.0045
+   ],
+   "p_negative": 0.7951,
+   "verdict": "INDISTINGUISHABLE"
+  },
+  "ruleB_network_equal": {
+   "raw_mm": 1.1865,
+   "projected_mm": 1.1776,
+   "delta_vs_previous_best_mm": -0.0001,
+   "ci95": [
+    -0.0092,
+    0.0088
+   ],
+   "p_negative": 0.5039,
+   "verdict": "INDISTINGUISHABLE"
+  },
+  "ruleC_nested_nnls": {
+   "raw_mm": 1.1796,
+   "projected_mm": 1.1727,
+   "delta_vs_previous_best_mm": -0.0049,
+   "ci95": [
+    -0.0112,
+    0.0014
+   ],
+   "p_negative": 0.9406,
+   "verdict": "INDISTINGUISHABLE"
+  },
+  "ruleD_dedup_cluster_equal": {
+   "raw_mm": 1.1788,
+   "projected_mm": 1.172,
+   "delta_vs_previous_best_mm": -0.0056,
+   "ci95": [
+    -0.0113,
+    0.0001
+   ],
+   "p_negative": 0.973,
+   "verdict": "INDISTINGUISHABLE"
+  }
+ },
+ "previous_best_mm": 1.1776,
+ "ruleC_weights": {
+  "per_fold": [
+   {
+    "dgcnn_mse": 0.0,
+    "dgcnn_dist": 0.224,
+    "dgcnn_phuber": 0.0497,
+    "kpconv": 0.1975,
+    "ptv3": 0.2801,
+    "famE_single": 0.2488,
+    "famE_bilat": 0.0
+   },
+   {
+    "dgcnn_mse": 0.1441,
+    "dgcnn_dist": 0.1638,
+    "dgcnn_phuber": 0.0495,
+    "kpconv": 0.1803,
+    "ptv3": 0.2477,
+    "famE_single": 0.1896,
+    "famE_bilat": 0.025
+   },
+   {
+    "dgcnn_mse": 0.0331,
+    "dgcnn_dist": 0.2362,
+    "dgcnn_phuber": 0.0,
+    "kpconv": 0.2394,
+    "ptv3": 0.2906,
+    "famE_single": 0.2006,
+    "famE_bilat": 0.0
+   },
+   {
+    "dgcnn_mse": 0.0229,
+    "dgcnn_dist": 0.2136,
+    "dgcnn_phuber": 0.0451,
+    "kpconv": 0.2253,
+    "ptv3": 0.2704,
+    "famE_single": 0.1559,
+    "famE_bilat": 0.0668
+   },
+   {
+    "dgcnn_mse": 0.104,
+    "dgcnn_dist": 0.1729,
+    "dgcnn_phuber": 0.0477,
+    "kpconv": 0.1968,
+    "ptv3": 0.2705,
+    "famE_single": 0.167,
+    "famE_bilat": 0.041
+   }
+  ],
+  "mean": {
+   "dgcnn_mse": 0.0608,
+   "dgcnn_dist": 0.2021,
+   "dgcnn_phuber": 0.0384,
+   "kpconv": 0.2079,
+   "ptv3": 0.2718,
+   "famE_single": 0.1924,
+   "famE_bilat": 0.0266
+  }
+ },
+ "leave_one_group_out_DIAGNOSTIC": {
+  "dgcnn_mse": 0.0001,
+  "dgcnn_dist": 0.0011,
+  "dgcnn_phuber": 0.0005,
+  "kpconv": 0.0078,
+  "ptv3": 0.0078,
+  "famE_single": -0.002,
+  "famE_bilat": -0.0031
+ },
+ "headline_rule": "ruleA_group_equal",
+ "best_rule_by_score": "ruleD_dedup_cluster_equal",
+ "conclusion": "Rule A -- equal weight per group, every group included, nothing selected or fitted -- reaches 1.1744 mm against the previous best 1.1776 mm (-0.0033, CI [-0.0112, 0.0045], INDISTINGUISHABLE). The thirteen previously-unused networks were unused because they lost REPLACEMENT tests, which is the wrong test for an ensemble member.",
+ "multiplicity_caveat": "Five weighting rules are now reported. Quoting whichever scores best is selection over five correlated choices and would carry optimism. Rule A selects nothing and is the headline for that reason; Rule D is motivated by a correlation threshold that predates this file and is score-blind, which makes it defensible a priori but does not exempt it from the same caution. No rule here has a paired interval excluding zero.",
+ "caveats": [
+  "Rule A is the headline precisely because it selects nothing. Reporting the best of four rules as the result would carry selection optimism over four correlated choices.",
+  "leave_one_group_out is a diagnostic. Dropping the group whose removal helps most is selection on the scored data and would need nested selection to be honest.",
+  "Groups are unequal in size (2-4 networks) and in internal diversity, so equal group weighting is a choice, not a neutral default -- it is simply a choice made a priori rather than from the scores.",
+  "Members are raw-network OOF; TTA is not applied here. Surface projection is.",
+  "The lockbox remains untouched: every number is out-of-fold over the 340 development ears under the frozen subject-grouped split."
+ ]
+}
