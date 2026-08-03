@@ -39,10 +39,27 @@
      "sup._antihelix": 1.413
     }
    },
+   "seed2": {
+    "pooled_oof_mm": 1.3271,
+    "per_fold_mm": [
+     1.3698,
+     1.3005,
+     1.3446,
+     1.2893,
+     1.3313
+    ],
+    "tangent_rmse_mm": 1.4362,
+    "per_contour_mm": {
+     "outer_helix": 1.3666,
+     "concha": 1.0824,
+     "inner_helix": 1.5795,
+     "sup._antihelix": 1.4579
+    }
+   },
    "variance": {
-    "fold_sd": 0.0449,
-    "seed_sd": 0.0169,
-    "resid_sd": 0.0141
+    "fold_sd": 0.0399,
+    "seed_sd": 0.0122,
+    "resid_sd": 0.015
    }
   },
   "bilat": {
@@ -80,20 +97,35 @@
      "sup._antihelix": 1.4067
     }
    },
+   "seed2": {
+    "pooled_oof_mm": 1.3196,
+    "per_fold_mm": [
+     1.325,
+     1.3033,
+     1.3495,
+     1.2885,
+     1.3315
+    ],
+    "tangent_rmse_mm": 1.4278,
+    "per_contour_mm": {
+     "outer_helix": 1.3486,
+     "concha": 1.077,
+     "inner_helix": 1.5805,
+     "sup._antihelix": 1.4528
+    }
+   },
    "variance": {
-    "fold_sd": 0.0364,
-    "seed_sd": 0.0095,
-    "resid_sd": 0.0143
+    "fold_sd": 0.0319,
+    "seed_sd": 0.0069,
+    "resid_sd": 0.0134
    }
   }
  },
- "missing": [
-  "single seed 2: fold 0 missing",
-  "bilat seed 2: fold 0 missing"
- ],
+ "missing": [],
  "seeds_complete_in_both_arms": [
   0,
-  1
+  1,
+  2
  ],
  "per_seed_delta": {
   "seed0": {
@@ -113,23 +145,32 @@
    ],
    "p_negative": 0.3399,
    "verdict": "INDISTINGUISHABLE"
+  },
+  "seed2": {
+   "delta_mm": -0.0075,
+   "ci95": [
+    -0.024,
+    0.0095
+   ],
+   "p_negative": 0.8073,
+   "verdict": "INDISTINGUISHABLE"
   }
  },
  "seed_ensembled": {
-  "n_seeds": 2,
-  "single_mm": 1.283,
-  "bilateral_mm": 1.2884,
-  "delta_mm": 0.0053,
+  "n_seeds": 3,
+  "single_mm": 1.2722,
+  "bilateral_mm": 1.2774,
+  "delta_mm": 0.0052,
   "ci95": [
-   -0.0104,
-   0.0213
+   -0.0067,
+   0.017
   ],
-  "p_negative": 0.2512,
+  "p_negative": 0.1919,
   "verdict": "INDISTINGUISHABLE"
  },
  "verdict": "INDISTINGUISHABLE",
- "complete": false,
- "conclusion": "With 2 of 3 seeds complete in both arms, bilateral minus single is +0.0053 mm (CI [-0.0104, 0.0213]). Bilateral context is indistinguishable from single-ear at this sample size. Together with context_probe.json's 121 hand-crafted features this closes the 'use the other ear' idea with a like-for-like architecture: the shared per-subject factor is real in the ORACLE corrections but is not recoverable from the observable geometry of either ear. NOT FINAL: 2 run group(s) still in flight; the seed spread below is the scale to read it against.",
+ "complete": true,
+ "conclusion": "With 3 of 3 seeds complete in both arms, bilateral minus single is +0.0052 mm (CI [-0.0067, 0.017]). Bilateral context is indistinguishable from single-ear at this sample size. Together with context_probe.json's 121 hand-crafted features this closes the 'use the other ear' idea with a like-for-like architecture: the shared per-subject factor is real in the ORACLE corrections but is not recoverable from the observable geometry of either ear.",
  "caveats": [
   "This family scores ~1.35mm, weaker than the 1.26mm DGCNN baseline, so a bilateral win here answers the scientific question without necessarily producing a better ensemble member. Porting the context to the strong backbone would be the follow-up.",
   "The bootstrap resamples SUBJECTS, not ears: the two ears of a subject are not independent, and that dependence is exactly what is under test.",

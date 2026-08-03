@@ -265,6 +265,8 @@ the search. All measured under the protocol above.
 | Per-mode variance recalibration | +0.0002 mm | already calibrated |
 | 12-channel multi-scale curvature input (probe) | +0.31 mm vs normals alone | rejected before GPU |
 | Family B — native-mesh vertex heatmap output | 1.655 mm, overfits from epoch 20 | rejected |
+| Family E — bilateral context, 5 folds × 3 seeds × 2 arms | +0.0052 mm, CI [−0.007, +0.017] | closed |
+| Geometric-median aggregation / per-landmark offsets | +0.0035…+0.0076 mm | already calibrated |
 
 Two of those deserve their footnote:
 
