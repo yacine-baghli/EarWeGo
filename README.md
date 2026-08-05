@@ -10,13 +10,13 @@ it with an ensemble of point-cloud networks.
 
 ## Result
 
-**1.1776 mm** mean ordered landmark error, pooled **out-of-fold over all 340 development
+**1.1710 mm** mean ordered landmark error, pooled **out-of-fold over all 340 development
 ears** (170 subjects, 5 subject-grouped folds). The 30-subject lockbox has never been
 touched — not for model selection, not for hyperparameters, not for ensemble weights.
 
 | | |
 | --- | ---: |
-| Pooled out-of-fold MLE, 340 ears | **1.1776 mm** |
+| Pooled out-of-fold MLE, 340 ears | **1.1710 mm** |
 | Median landmark error | 0.931 mm |
 | P90 | 2.332 mm |
 | Within 1 mm / 2 mm | 54 % / 86 % |
@@ -41,12 +41,18 @@ A comparison pipeline reports 1.1726 mm end-to-end on 30 unseen subjects. That i
 **different protocol** on a different split and is not a like-for-like number; it is drawn
 above as a reference line, not as a ranking.
 
+Two weighting rules score better still — **1.1699 mm** with nested-OOF nonnegative weights
+over all seven model groups, and **1.1684 mm** when near-duplicate groups (signed-error
+correlation ≥ 0.95) are merged first. Both have intervals excluding zero, and both involve a
+choice the headline does not; five rules were compared, so the headline is deliberately the
+one that selects nothing. See [`ensemble_all.json`](research/results/ensemble_all.json).
+
 <details>
 <summary><b>What the deployed submission scores, which is not the same thing</b></summary>
 
 The torch-free estimator exported in `deep_model/` is the 4-seed DGCNN with TTA and
-surface projection: **1.3144 mm** pooled OOF over the same 340 ears. The 1.1776 mm figure
-is the research ensemble (DGCNN ×3 seeds + KPConv ×2 + PTv3 ×2), which has not yet been
+surface projection: **1.3144 mm** pooled OOF over the same 340 ears. The 1.1710 mm figure
+is the research ensemble (DGCNN ×5 seeds + KPConv ×4 + PTv3 ×4), which has not yet been
 exported to the NumPy inference path. Both numbers are measured under the same protocol;
 they differ in which models are in the box.
 </details>
@@ -94,17 +100,20 @@ coarse 85 landmarks  (~3.7 mm)
    │  normals, not by negating them (this was a real bug; fixing it was worth −0.048 mm)
    ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│  DGCNN ×3 seeds      2048 pts   EdgeConv k=20, offset→snap head ×4,   1.2292 │
+│  DGCNN ×5 seeds      2048 pts   EdgeConv k=20, offset→snap head ×4,   1.2185 │
 │                                 per-contour 1-D refinement                    │
-│  KPConv ×2 seeds     8192 pts   true fixed-radius neighbourhoods in mm 1.2516 │
-│  PTv3   ×2 seeds     8192 pts   serialised patch attention             1.2417 │
+│  KPConv ×4 seeds     8192 pts   true fixed-radius neighbourhoods in mm 1.2335 │
+│  PTv3   ×4 seeds     8192 pts   serialised patch attention             1.2185 │
 └──────────────────────────────────────────────────────────────────────────────┘
-   │  equal weights — fitted weights were measured to gain nothing (16 configs)
-   ▼  1.1827 mm
+   │  equal weight per group, plain seed mean within group — no fitting, no selection
+   ▼  1.1761 mm
 exact point-to-triangle surface projection
    ▼
-1.1776 mm
+1.1710 mm
 ```
+
+Seeds are the reliable lever and they have not saturated: going from 7 networks to 13 in
+this same structure moved 1.1776 → 1.1710 mm with a paired interval of [−0.0107, −0.0024].
 
 The **offset→snap head** is the piece that matters. Each pass emits an unconstrained
 displacement (so a landmark outside the initial window is still reachable — without it the
@@ -192,12 +201,12 @@ information is missing*:
 
 | correction | MLE | Δ | dof / ear |
 | --- | ---: | ---: | ---: |
-| none — current prediction | 1.1776 | — | 0 |
-| global rigid | 1.0589 | −0.119 | 6 |
-| global similarity | 1.0513 | −0.126 | 7 |
-| per-contour tangent slide | 0.9216 | −0.256 | 4 |
-| global similarity + per-contour slide | 0.8913 | −0.286 | 11 |
-| **per-contour similarity** | **0.6026** | **−0.575** | 28 |
+| none — current prediction | 1.1710 | — | 0 |
+| global rigid | 1.0540 | −0.117 | 6 |
+| global similarity | 1.0463 | −0.125 | 7 |
+| per-contour tangent slide | 0.9169 | −0.254 | 4 |
+| global similarity + per-contour slide | 0.8873 | −0.284 | 11 |
+| **per-contour similarity** | **0.5983** | **−0.573** | 28 |
 
 **Twenty-eight numbers per ear reach 0.60 mm.** The contour *shapes* are already
 essentially correct; their *placement* is wrong. And the placement errors are structured,

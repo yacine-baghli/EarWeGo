@@ -1,37 +1,34 @@
 {
- "pooled_oof_mm": 1.1776,
+ "pooled_oof_mm": 1.171,
+ "headline": "same 3-group structure as the previous best, with more seeds per group (13 networks vs 7). No structural change, no weighting change, no selection.",
  "n_ears": 340,
- "median_mm": 0.9305,
- "p90_mm": 2.3323,
  "members": {
-  "dgcnn_normals_3seed": 1.2292,
-  "kpconv_2seed": 1.2516,
-  "ptv3_2seed": 1.2417
+  "dgcnn_mse_5seed": 1.2185,
+  "kpconv_4seed": 1.2335,
+  "ptv3_4seed": 1.2185
  },
- "stages_mm": {
-  "ensemble_equal_weight": 1.1827,
-  "plus_surface_projection": 1.1776
- },
- "per_contour_mm": {
-  "outer_helix": 1.2493,
-  "concha": 0.9241,
-  "inner_helix": 1.4641,
-  "sup._antihelix": 1.1861
- },
- "vs_previous_best_1.1897": {
-  "delta_mm": -0.0121,
+ "vs_previous_best_1.1776": {
+  "delta_mm": -0.0066,
   "ci95": [
-   -0.0178,
-   -0.0064
+   -0.0107,
+   -0.0024
   ],
-  "p_negative": 1.0
+  "p_negative": 0.999,
+  "verdict": "ADOPT"
  },
- "profile_probe_fold0": {
-  "base": 1.2809,
-  "fixed": 1.3305,
-  "learned": 1.2718,
-  "all4_negative_control": 1.3453,
-  "note": "all4 worst as designed, confirming the placement acts as claimed; fixed worse than base; learned -0.0091 is one fold, one seed, +88k params -- inside noise, not counted"
+ "better_but_involving_a_weighting_choice": {
+  "ruleC_nested_nnls_all7groups_mm": 1.1699,
+  "ruleC_ci95": [
+   -0.0143,
+   -0.0012
+  ],
+  "ruleD_dedup_cluster_equal_mm": 1.1684,
+  "ruleD_ci95": [
+   -0.0161,
+   -0.0025
+  ],
+  "note": "Rule C is the ensembling method the programme brief specified (nested-OOF nonnegative weights). Rule D merges groups correlating above the pre-existing dup_r=0.95. Both beat the headline, both involve a choice the headline does not, and five rules were compared -- see multiplicity_caveat in ensemble_all.json."
  },
- "note": "equal weights (no fitting, no selection optimism); dense-SSM blend omitted (+0.0019 once normals corrected)"
+ "reference_pipeline_note": "a competing pipeline reports 1.1726mm end-to-end on 30 unseen subjects under a DIFFERENT protocol; not like-for-like",
+ "note": "equal weights within group (plain seed mean); exact surface projection applied last"
 }

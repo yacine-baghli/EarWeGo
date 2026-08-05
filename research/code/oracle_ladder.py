@@ -15,7 +15,14 @@ import numpy as np
 W = "scratch"
 of = np.load(f"{W}/ortho_feats.npz")
 GT, T = of["gt"].astype(float), of["t"]
-P = np.load(f"{W}/ensemble5_proj.npy")
+# the CURRENT best prediction, so the ladder's baseline row cannot drift from the pipeline
+# it is meant to describe (make_figures.py asserts the two agree and caught exactly that)
+import os
+PRED = os.environ.get("PRED", f"{W}/ensemble_best_proj.npy")
+if not os.path.exists(PRED):
+    PRED = f"{W}/ensemble5_proj.npy"
+P = np.load(PRED)
+print(f"prediction: {PRED}")
 NE = len(P)
 CONT = [(0, 24, "outer_helix"), (25, 54, "concha"),
         (55, 74, "inner_helix"), (75, 84, "sup._antihelix")]

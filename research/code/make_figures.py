@@ -16,6 +16,7 @@ Outputs: img/fig_progress.png, fig_oracle_ladder.png, fig_error_anatomy.png,
     python research/code/make_figures.py
 """
 import json
+import os
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
@@ -58,7 +59,9 @@ def title(ax, t, sub=None):
                     color=MUTED, va="bottom")
 
 
-P = np.load("scratch/ensemble5_proj.npy").astype(np.float64)
+# the current best: same 3 groups as before with more seeds per group, then projection
+BEST = "scratch/ensemble_best_proj.npy"
+P = np.load(BEST if os.path.exists(BEST) else "scratch/ensemble5_proj.npy").astype(np.float64)
 Z = np.load("scratch/ortho_feats.npz")
 GT, T, B, N = (Z[k].astype(np.float64) for k in ("gt", "t", "b", "n"))
 E = P - GT
@@ -72,9 +75,9 @@ steps = [("single seed, DGCNN", 1.3204, ""),
          ("3-seed ensemble", 1.2773, "variance"),
          ("corrected surface normals", 1.2292, "input"),
          ("+ KPConv + PTv3", 1.1952, "diversity"),
-         ("2 seeds per member", 1.1827, "variance"),
-         ("exact surface projection", round(float(POOLED), 4), "output")]
-assert abs(steps[-1][1] - LAD["pooled_oof_mm"]) < 5e-4, "figure disagrees with best_current.json"
+         ("+ exact surface projection", 1.1776, "output"),
+         ("4-5 seeds per member", round(float(POOLED), 4), "variance")]
+assert abs(steps[-1][1] - LAD["pooled_oof_mm"]) < 5e-4,     f"figure {steps[-1][1]} disagrees with best_current.json {LAD['pooled_oof_mm']}"
 
 fig, ax = plt.subplots(figsize=(7.4, 3.5))
 y = np.arange(len(steps))[::-1]
@@ -86,7 +89,7 @@ for yy, (lbl, v, kind) in zip(y, steps):
                 va="center", fontsize=9, fontweight="bold", color=INK)
 ax.set_yticks(y, [s[0] for s in steps], fontsize=9)
 ax.tick_params(axis="y", labelcolor=INK)
-ax.set_xlim(1.05, 1.40)
+ax.set_xlim(1.10, 1.40)
 ax.set_xlabel("pooled out-of-fold mean landmark error (mm), 340 ears")
 ax.axvline(1.1726, color=NEG, lw=1.2, ls=(0, (4, 3)), zorder=1)
 ax.annotate("reference pipeline 1.1726 mm\n(different protocol)", (1.1726, 0.55),
@@ -94,7 +97,7 @@ ax.annotate("reference pipeline 1.1726 mm\n(different protocol)", (1.1726, 0.55)
             textcoords="offset points", ha="right", va="center", fontsize=8, color=NEG)
 bare(ax, "x")
 title(ax, "Every measured gain came from variance reduction",
-      "No single model got better at geometry — the best single-family model is still 1.229 mm.")
+      "No single model got better at geometry — the best single-family model is still 1.219 mm.")
 fig.savefig("img/fig_progress.png")
 plt.close(fig)
 
