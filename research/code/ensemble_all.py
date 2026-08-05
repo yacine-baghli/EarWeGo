@@ -73,13 +73,20 @@ for a in FJ:
 
 # ------------------------------------------------------------------- member discovery
 SPECS = {
-    "dgcnn_mse":    (f"{W}/screen_normalsfix_s{{s}}_f{{f}}", range(6)),
+    # seeds 0-2 use the plain spelling, 3-4 were launched with OUTTAG=normalsfix_s<S> and
+    # are double-suffixed; load_net tries both so neither set is silently dropped
+    "dgcnn_mse":    ([f"{W}/screen_normalsfix_s{s}_f{{f}}" for s in range(6)]
+                     + [f"{W}/screen_normalsfix_s{s}_s{s}_f{{f}}" for s in range(6)], None),
     "dgcnn_dist":   (f"{W}/screen_loss_dist_s{{s}}_f{{f}}_s{{s}}_f{{f}}", range(6)),
     "dgcnn_phuber": (f"{W}/screen_loss_phuber_s{{s}}_f{{f}}_s{{s}}_f{{f}}", range(6)),
-    "kpconv":       ([f"{W}/famA_kpconv_f{{f}}", f"{W}/famA_kpconv_s1_f{{f}}",
-                      f"{W}/famA_kpconv_s2_f{{f}}", f"{W}/famA_kpconv_s3_f{{f}}"], None),
-    "ptv3":         ([f"{W}/famA_ptv3_f{{f}}", f"{W}/famA_ptv3_s1_f{{f}}",
-                      f"{W}/famA_ptv3_s2_f{{f}}", f"{W}/famA_ptv3_s3_f{{f}}"], None),
+    "kpconv":       ([f"{W}/famA_kpconv_f{{f}}"]
+                     + [f"{W}/famA_kpconv_s{s}_f{{f}}" for s in range(1, 6)], None),
+    "ptv3":         ([f"{W}/famA_ptv3_f{{f}}"]
+                     + [f"{W}/famA_ptv3_s{s}_f{{f}}" for s in range(1, 6)], None),
+    "pointnext":    ([f"{W}/famA_pointnext_f{{f}}"]
+                     + [f"{W}/famA_pointnext_s{s}_f{{f}}" for s in range(1, 6)], None),
+    "lossA_kpconv_dist": ([f"{W}/lossA_kpconv_dist_s{s}_f{{f}}" for s in range(3)], None),
+    "lossA_ptv3_dist":   ([f"{W}/lossA_ptv3_dist_s{s}_f{{f}}" for s in range(3)], None),
     "famE_single":  (f"{W}/famE_single_s{{s}}_f{{f}}", range(6)),
     "famE_bilat":   (f"{W}/famE_bilat_s{{s}}_f{{f}}", range(6)),
 }

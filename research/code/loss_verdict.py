@@ -97,11 +97,19 @@ def paired(Pa, Pb, seed=5):
 
 
 # ------------------------------------------------------------------ the mse baseline
+def find_mse(s, f):
+    """Seeds 0-2 shipped as screen_normalsfix_s<S>_f<F>; seeds 3-4 were launched with
+    OUTTAG=normalsfix_s<S> and are therefore DOUBLE suffixed, same trap as the loss arms."""
+    for pat in (f"{W}/screen_normalsfix_s{s}_f{f}",
+                f"{W}/screen_normalsfix_s{s}_s{s}_f{f}"):
+        if os.path.exists(pat + ".npy") and os.path.exists(pat + ".json"):
+            return pat
+    return None
+
+
 BASE = {}
-for s in BASE_SEEDS:
-    P, why = assemble(lambda sd, f, s=s: (f"{W}/screen_normalsfix_s{s}_f{f}"
-                                          if os.path.exists(f"{W}/screen_normalsfix_s{s}_f{f}.npy")
-                                          else None), s)
+for s in range(6):
+    P, why = assemble(lambda sd, f, s=s: find_mse(s, f), s)
     if P is not None:
         BASE[s] = P
 assert BASE, "no mse baseline seeds found"
@@ -128,7 +136,7 @@ out = {"question": "does training against the metric beat training against its s
 
 for arm in ARMS:
     seeds_done = []
-    for s in range(3):
+    for s in range(6):   # dist reached 5 seeds; a hardcoded 3 would silently drop the endpoint
         P, why = assemble(lambda sd, f, a=arm, s=s: find(a, s, f), s)
         if P is None:
             got = sum(1 for f in range(5) if find(arm, s, f))

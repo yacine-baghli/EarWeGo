@@ -1,6 +1,6 @@
 {
  "n_groups": 7,
- "n_networks": 20,
+ "n_networks": 27,
  "n_ears": 340,
  "n_bootstrap": 20000,
  "ruleD_clusters": {
@@ -16,22 +16,25 @@
  "reframe": "an ensemble member does not need to BEAT the baseline, only to differ from it; dist and phuber failed replacement tests but are useful members",
  "groups": {
   "dgcnn_mse": {
-   "n_nets": 3,
-   "pooled_oof_mm": 1.2292,
+   "n_nets": 5,
+   "pooled_oof_mm": 1.2185,
    "per_net_mm": [
     1.2685,
     1.2728,
-    1.2675
+    1.2675,
+    1.2634,
+    1.2777
    ]
   },
   "dgcnn_dist": {
-   "n_nets": 4,
-   "pooled_oof_mm": 1.2138,
+   "n_nets": 5,
+   "pooled_oof_mm": 1.2101,
    "per_net_mm": [
     1.2578,
     1.2676,
     1.2624,
-    1.2594
+    1.2594,
+    1.2529
    ]
   },
   "dgcnn_phuber": {
@@ -44,19 +47,23 @@
    ]
   },
   "kpconv": {
-   "n_nets": 2,
-   "pooled_oof_mm": 1.2516,
+   "n_nets": 4,
+   "pooled_oof_mm": 1.2335,
    "per_net_mm": [
     1.2881,
-    1.2833
+    1.2833,
+    1.2794,
+    1.2929
    ]
   },
   "ptv3": {
-   "n_nets": 2,
-   "pooled_oof_mm": 1.2417,
+   "n_nets": 4,
+   "pooled_oof_mm": 1.2185,
    "per_net_mm": [
     1.2982,
-    1.2837
+    1.2837,
+    1.3007,
+    1.291
    ]
   },
   "famE_single": {
@@ -82,125 +89,125 @@
   "signed_tangent_corr_matrix": {
    "dgcnn_mse": {
     "dgcnn_mse": 1.0,
-    "dgcnn_dist": 0.971,
-    "dgcnn_phuber": 0.971,
-    "kpconv": 0.887,
-    "ptv3": 0.89,
-    "famE_single": 0.903,
-    "famE_bilat": 0.901
-   },
-   "dgcnn_dist": {
-    "dgcnn_mse": 0.971,
-    "dgcnn_dist": 1.0,
-    "dgcnn_phuber": 0.979,
-    "kpconv": 0.892,
-    "ptv3": 0.897,
-    "famE_single": 0.911,
+    "dgcnn_dist": 0.98,
+    "dgcnn_phuber": 0.976,
+    "kpconv": 0.9,
+    "ptv3": 0.911,
+    "famE_single": 0.91,
     "famE_bilat": 0.908
    },
+   "dgcnn_dist": {
+    "dgcnn_mse": 0.98,
+    "dgcnn_dist": 1.0,
+    "dgcnn_phuber": 0.98,
+    "kpconv": 0.904,
+    "ptv3": 0.913,
+    "famE_single": 0.914,
+    "famE_bilat": 0.911
+   },
    "dgcnn_phuber": {
-    "dgcnn_mse": 0.971,
-    "dgcnn_dist": 0.979,
+    "dgcnn_mse": 0.976,
+    "dgcnn_dist": 0.98,
     "dgcnn_phuber": 1.0,
-    "kpconv": 0.889,
-    "ptv3": 0.894,
+    "kpconv": 0.898,
+    "ptv3": 0.907,
     "famE_single": 0.903,
     "famE_bilat": 0.904
    },
    "kpconv": {
-    "dgcnn_mse": 0.887,
-    "dgcnn_dist": 0.892,
-    "dgcnn_phuber": 0.889,
+    "dgcnn_mse": 0.9,
+    "dgcnn_dist": 0.904,
+    "dgcnn_phuber": 0.898,
     "kpconv": 1.0,
-    "ptv3": 0.861,
-    "famE_single": 0.858,
-    "famE_bilat": 0.858
+    "ptv3": 0.89,
+    "famE_single": 0.869,
+    "famE_bilat": 0.868
    },
    "ptv3": {
-    "dgcnn_mse": 0.89,
-    "dgcnn_dist": 0.897,
-    "dgcnn_phuber": 0.894,
-    "kpconv": 0.861,
+    "dgcnn_mse": 0.911,
+    "dgcnn_dist": 0.913,
+    "dgcnn_phuber": 0.907,
+    "kpconv": 0.89,
     "ptv3": 1.0,
-    "famE_single": 0.877,
-    "famE_bilat": 0.872
+    "famE_single": 0.892,
+    "famE_bilat": 0.887
    },
    "famE_single": {
-    "dgcnn_mse": 0.903,
-    "dgcnn_dist": 0.911,
+    "dgcnn_mse": 0.91,
+    "dgcnn_dist": 0.914,
     "dgcnn_phuber": 0.903,
-    "kpconv": 0.858,
-    "ptv3": 0.877,
+    "kpconv": 0.869,
+    "ptv3": 0.892,
     "famE_single": 1.0,
     "famE_bilat": 0.971
    },
    "famE_bilat": {
-    "dgcnn_mse": 0.901,
-    "dgcnn_dist": 0.908,
+    "dgcnn_mse": 0.908,
+    "dgcnn_dist": 0.911,
     "dgcnn_phuber": 0.904,
-    "kpconv": 0.858,
-    "ptv3": 0.872,
+    "kpconv": 0.868,
+    "ptv3": 0.887,
     "famE_single": 0.971,
     "famE_bilat": 1.0
    }
   },
-  "mean_off_diagonal": 0.905
+  "mean_off_diagonal": 0.914
  },
  "rules": {
   "shipped_3group": {
-   "raw_mm": 1.1827,
-   "projected_mm": 1.1776,
-   "delta_vs_previous_best_mm": 0.0,
+   "raw_mm": 1.1761,
+   "projected_mm": 1.171,
+   "delta_vs_previous_best_mm": -0.0066,
    "ci95": [
-    0.0,
-    0.0
+    -0.0107,
+    -0.0024
    ],
-   "p_negative": 0.0,
-   "verdict": "INDISTINGUISHABLE"
+   "p_negative": 0.999,
+   "verdict": "ADOPT"
   },
   "ruleA_group_equal": {
-   "raw_mm": 1.1828,
-   "projected_mm": 1.1744,
-   "delta_vs_previous_best_mm": -0.0033,
+   "raw_mm": 1.1808,
+   "projected_mm": 1.1723,
+   "delta_vs_previous_best_mm": -0.0053,
    "ci95": [
-    -0.0112,
-    0.0045
+    -0.0138,
+    0.0031
    ],
-   "p_negative": 0.7951,
+   "p_negative": 0.8923,
    "verdict": "INDISTINGUISHABLE"
   },
   "ruleB_network_equal": {
-   "raw_mm": 1.1865,
-   "projected_mm": 1.1776,
-   "delta_vs_previous_best_mm": -0.0001,
+   "raw_mm": 1.1791,
+   "projected_mm": 1.1711,
+   "delta_vs_previous_best_mm": -0.0065,
    "ci95": [
-    -0.0092,
-    0.0088
+    -0.0144,
+    0.0013
    ],
-   "p_negative": 0.5039,
+   "p_negative": 0.9487,
    "verdict": "INDISTINGUISHABLE"
   },
   "ruleC_nested_nnls": {
-   "raw_mm": 1.1796,
-   "projected_mm": 1.1727,
-   "delta_vs_previous_best_mm": -0.0049,
+   "raw_mm": 1.1761,
+   "projected_mm": 1.1699,
+   "delta_vs_previous_best_mm": -0.0078,
    "ci95": [
-    -0.0112,
-    0.0014
+    -0.0143,
+    -0.0012
    ],
-   "p_negative": 0.9406,
-   "verdict": "INDISTINGUISHABLE"
+   "p_negative": 0.9896,
+   "verdict": "ADOPT"
   },
   "ruleD_dedup_cluster_equal": {
-   "raw_mm": 1.1788,
-   "projected_mm": 1.172,
-   "delta_vs_previous_best_mm": -0.0056,
+   "raw_mm": 1.1752,
+   "projected_mm": 1.1684,
+   "delta_vs_previous_best_mm": -0.0092,
    "ci95": [
-    -0.0113,
-    0.0001
+    -0.0161,
+    -0.0025
    ],
-   "p_negative": 0.973,
-   "verdict": "INDISTINGUISHABLE"
+   "p_negative": 0.995,
+   "verdict": "ADOPT"
   }
  },
  "previous_best_mm": 1.1776,
@@ -208,72 +215,72 @@
   "per_fold": [
    {
     "dgcnn_mse": 0.0,
-    "dgcnn_dist": 0.224,
-    "dgcnn_phuber": 0.0497,
-    "kpconv": 0.1975,
-    "ptv3": 0.2801,
-    "famE_single": 0.2488,
+    "dgcnn_dist": 0.2291,
+    "dgcnn_phuber": 0.0226,
+    "kpconv": 0.2286,
+    "ptv3": 0.2835,
+    "famE_single": 0.2362,
     "famE_bilat": 0.0
    },
    {
-    "dgcnn_mse": 0.1441,
-    "dgcnn_dist": 0.1638,
-    "dgcnn_phuber": 0.0495,
-    "kpconv": 0.1803,
-    "ptv3": 0.2477,
-    "famE_single": 0.1896,
-    "famE_bilat": 0.025
+    "dgcnn_mse": 0.209,
+    "dgcnn_dist": 0.1266,
+    "dgcnn_phuber": 0.0076,
+    "kpconv": 0.2096,
+    "ptv3": 0.2583,
+    "famE_single": 0.1752,
+    "famE_bilat": 0.0137
    },
    {
-    "dgcnn_mse": 0.0331,
-    "dgcnn_dist": 0.2362,
+    "dgcnn_mse": 0.0774,
+    "dgcnn_dist": 0.1788,
     "dgcnn_phuber": 0.0,
-    "kpconv": 0.2394,
-    "ptv3": 0.2906,
-    "famE_single": 0.2006,
+    "kpconv": 0.2554,
+    "ptv3": 0.3011,
+    "famE_single": 0.1874,
     "famE_bilat": 0.0
    },
    {
-    "dgcnn_mse": 0.0229,
-    "dgcnn_dist": 0.2136,
-    "dgcnn_phuber": 0.0451,
-    "kpconv": 0.2253,
-    "ptv3": 0.2704,
-    "famE_single": 0.1559,
-    "famE_bilat": 0.0668
+    "dgcnn_mse": 0.0,
+    "dgcnn_dist": 0.1982,
+    "dgcnn_phuber": 0.0371,
+    "kpconv": 0.2498,
+    "ptv3": 0.3131,
+    "famE_single": 0.1327,
+    "famE_bilat": 0.0691
    },
    {
-    "dgcnn_mse": 0.104,
-    "dgcnn_dist": 0.1729,
-    "dgcnn_phuber": 0.0477,
-    "kpconv": 0.1968,
-    "ptv3": 0.2705,
-    "famE_single": 0.167,
-    "famE_bilat": 0.041
+    "dgcnn_mse": 0.1683,
+    "dgcnn_dist": 0.0903,
+    "dgcnn_phuber": 0.0379,
+    "kpconv": 0.2428,
+    "ptv3": 0.2776,
+    "famE_single": 0.1496,
+    "famE_bilat": 0.0334
    }
   ],
   "mean": {
-   "dgcnn_mse": 0.0608,
-   "dgcnn_dist": 0.2021,
-   "dgcnn_phuber": 0.0384,
-   "kpconv": 0.2079,
-   "ptv3": 0.2718,
-   "famE_single": 0.1924,
-   "famE_bilat": 0.0266
+   "dgcnn_mse": 0.0909,
+   "dgcnn_dist": 0.1646,
+   "dgcnn_phuber": 0.021,
+   "kpconv": 0.2372,
+   "ptv3": 0.2867,
+   "famE_single": 0.1762,
+   "famE_bilat": 0.0232
   }
  },
  "leave_one_group_out_DIAGNOSTIC": {
-  "dgcnn_mse": 0.0001,
-  "dgcnn_dist": 0.0011,
-  "dgcnn_phuber": 0.0005,
-  "kpconv": 0.0078,
-  "ptv3": 0.0078,
-  "famE_single": -0.002,
-  "famE_bilat": -0.0031
+  "dgcnn_mse": -0.0,
+  "dgcnn_dist": 0.0008,
+  "dgcnn_phuber": 0.0001,
+  "kpconv": 0.0083,
+  "ptv3": 0.0079,
+  "famE_single": -0.0025,
+  "famE_bilat": -0.0036
  },
  "headline_rule": "ruleA_group_equal",
  "best_rule_by_score": "ruleD_dedup_cluster_equal",
- "conclusion": "Rule A -- equal weight per group, every group included, nothing selected or fitted -- reaches 1.1744 mm against the previous best 1.1776 mm (-0.0033, CI [-0.0112, 0.0045], INDISTINGUISHABLE). The thirteen previously-unused networks were unused because they lost REPLACEMENT tests, which is the wrong test for an ensemble member.",
+ "conclusion": "Rule A -- equal weight per group, every group included, nothing selected or fitted -- reaches 1.1723 mm against the previous best 1.1776 mm (-0.0053, CI [-0.0138, 0.0031], INDISTINGUISHABLE). The thirteen previously-unused networks were unused because they lost REPLACEMENT tests, which is the wrong test for an ensemble member.",
  "multiplicity_caveat": "Five weighting rules are now reported. Quoting whichever scores best is selection over five correlated choices and would carry optimism. Rule A selects nothing and is the headline for that reason; Rule D is motivated by a correlation threshold that predates this file and is score-blind, which makes it defensible a priori but does not exempt it from the same caution. No rule here has a paired interval excluding zero.",
  "caveats": [
   "Rule A is the headline precisely because it selects nothing. Reporting the best of four rules as the result would carry selection optimism over four correlated choices.",

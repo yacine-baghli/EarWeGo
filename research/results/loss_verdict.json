@@ -7,27 +7,31 @@
   "seeds": [
    0,
    1,
-   2
+   2,
+   3,
+   4
   ],
   "per_seed_pooled_mm": [
    1.2685,
    1.2728,
-   1.2675
+   1.2675,
+   1.2634,
+   1.2777
   ],
-  "seed_ensemble_mm": 1.2292,
+  "seed_ensemble_mm": 1.2185,
   "per_fold_seed_mean_mm": [
-   1.2652,
-   1.2504,
-   1.3179,
-   1.2124,
-   1.3022
+   1.2723,
+   1.2548,
+   1.3156,
+   1.2035,
+   1.3037
   ],
   "per_fold_seed_sd_mm": [
-   0.0128,
-   0.013,
-   0.0133,
-   0.0287,
-   0.0051
+   0.0144,
+   0.0109,
+   0.0101,
+   0.0303,
+   0.0044
   ]
  },
  "arms": {
@@ -42,12 +46,12 @@
      1.2823
     ],
     "vs_mse_seed_ensemble": {
-     "delta_mm": 0.0286,
+     "delta_mm": 0.0393,
      "ci95": [
-      0.0137,
-      0.0437
+      0.0247,
+      0.0539
      ],
-     "p_negative": 0.0001,
+     "p_negative": 0.0,
      "verdict": "HARMFUL"
     },
     "vs_mse_same_seed": {
@@ -70,10 +74,10 @@
      1.3004
     ],
     "vs_mse_seed_ensemble": {
-     "delta_mm": 0.0384,
+     "delta_mm": 0.0491,
      "ci95": [
-      0.0216,
-      0.0548
+      0.0325,
+      0.0654
      ],
      "p_negative": 0.0,
      "verdict": "HARMFUL"
@@ -98,10 +102,10 @@
      1.2802
     ],
     "vs_mse_seed_ensemble": {
-     "delta_mm": 0.0332,
+     "delta_mm": 0.0439,
      "ci95": [
-      0.0164,
-      0.0503
+      0.0281,
+      0.0598
      ],
      "p_negative": 0.0,
      "verdict": "HARMFUL"
@@ -116,23 +120,81 @@
      "verdict": "INDISTINGUISHABLE"
     }
    },
+   "seed3": {
+    "pooled_oof_mm": 1.2594,
+    "per_fold_mm": [
+     1.2782,
+     1.2398,
+     1.3057,
+     1.1788,
+     1.2947
+    ],
+    "vs_mse_seed_ensemble": {
+     "delta_mm": 0.0409,
+     "ci95": [
+      0.025,
+      0.0564
+     ],
+     "p_negative": 0.0,
+     "verdict": "HARMFUL"
+    },
+    "vs_mse_same_seed": {
+     "delta_mm": -0.004,
+     "ci95": [
+      -0.0232,
+      0.0146
+     ],
+     "p_negative": 0.6663,
+     "verdict": "INDISTINGUISHABLE"
+    }
+   },
+   "seed4": {
+    "pooled_oof_mm": 1.2529,
+    "per_fold_mm": [
+     1.2865,
+     1.2282,
+     1.302,
+     1.1749,
+     1.273
+    ],
+    "vs_mse_seed_ensemble": {
+     "delta_mm": 0.0344,
+     "ci95": [
+      0.0188,
+      0.0502
+     ],
+     "p_negative": 0.0,
+     "verdict": "HARMFUL"
+    },
+    "vs_mse_same_seed": {
+     "delta_mm": -0.0248,
+     "ci95": [
+      -0.0451,
+      -0.0038
+     ],
+     "p_negative": 0.9897,
+     "verdict": "ADOPT"
+    }
+   },
    "seed_ensembled": {
-    "n_seeds": 3,
+    "n_seeds": 5,
     "seeds": [
      0,
      1,
-     2
+     2,
+     3,
+     4
     ],
-    "mle_mm": 1.2189,
-    "mse_same_seeds_mm": 1.2292,
-    "delta_vs_mse_same_seeds_mm": -0.0103,
+    "mle_mm": 1.2101,
+    "mse_same_seeds_mm": 1.2185,
+    "delta_vs_mse_same_seeds_mm": -0.0084,
     "ci95": [
-     -0.0213,
-     0.0008
+     -0.0172,
+     0.0002
     ],
-    "p_negative": 0.9671,
+    "p_negative": 0.9726,
     "verdict": "INDISTINGUISHABLE",
-    "mse_all_seed_ensemble_mm": 1.2292
+    "mse_all_seed_ensemble_mm": 1.2185
    }
   },
   "phuber": {
@@ -146,12 +208,12 @@
      1.2815
     ],
     "vs_mse_seed_ensemble": {
-     "delta_mm": 0.0267,
+     "delta_mm": 0.0374,
      "ci95": [
-      0.0121,
-      0.0412
+      0.0228,
+      0.0516
      ],
-     "p_negative": 0.0001,
+     "p_negative": 0.0,
      "verdict": "HARMFUL"
     },
     "vs_mse_same_seed": {
@@ -174,12 +236,12 @@
      1.2969
     ],
     "vs_mse_seed_ensemble": {
-     "delta_mm": 0.0291,
+     "delta_mm": 0.0398,
      "ci95": [
-      0.0129,
-      0.0451
+      0.024,
+      0.0556
      ],
-     "p_negative": 0.0003,
+     "p_negative": 0.0,
      "verdict": "HARMFUL"
     },
     "vs_mse_same_seed": {
@@ -202,10 +264,10 @@
      1.3013
     ],
     "vs_mse_seed_ensemble": {
-     "delta_mm": 0.0399,
+     "delta_mm": 0.0506,
      "ci95": [
-      0.0236,
-      0.0561
+      0.0349,
+      0.0662
      ],
      "p_negative": 0.0,
      "verdict": "HARMFUL"
@@ -236,30 +298,32 @@
     ],
     "p_negative": 0.9318,
     "verdict": "INDISTINGUISHABLE",
-    "mse_all_seed_ensemble_mm": 1.2292
+    "mse_all_seed_ensemble_mm": 1.2185
    }
   }
  },
  "partial": [],
  "verdict": "INDISTINGUISHABLE",
  "best_arm": "dist",
- "headline_anchor": "the mse ensemble over the SAME seeds [0, 1, 2]",
+ "headline_anchor": "the mse ensemble over the SAME seeds [0, 1, 2, 3, 4]",
  "fair_comparison_note": "Every headline comparison is SEED MATCHED. Mismatching the seed count measures seed-ensembling rather than the objective, and it misleads in BOTH directions: a 1-seed dist arm against the 3-seed mse ensemble reads +0.0286mm (arm looks bad), while a 2-seed dist ensemble against the 3-seed mse ensemble reads +0.0012mm when the matched 2-vs-2 comparison is -0.0089mm (arm looks neutral instead of ahead). Both errors were made in this file before being fixed.",
- "conclusion": "Best arm dist at 1.2189 mm, -0.0103 vs the mse ensemble over the SAME seeds [0, 1, 2]. The objective mismatch is real in the distribution but does not pay in millimetres. Combined with metric_alignment.py, the mean/median gap is closed both post hoc and at training time.",
+ "conclusion": "Best arm dist at 1.2101 mm, -0.0084 vs the mse ensemble over the SAME seeds [0, 1, 2, 3, 4]. The objective mismatch is real in the distribution but does not pay in millimetres. Combined with metric_alignment.py, the mean/median gap is closed both post hoc and at training time.",
  "pooled_across_arms": {
   "note": "dist and phuber are not independent tests -- both are sub-quadratic on the tail and succeed or fail for the same reason -- so the honest summary is the pooled sign test over every seed of either arm against mse at that same seed.",
   "per_seed_deltas_mm": [
    -0.0107,
    -0.0052,
    -0.0051,
+   -0.004,
+   -0.0248,
    -0.0126,
    -0.0145,
    0.0016
   ],
-  "n_runs": 6,
-  "n_negative": 5,
-  "mean_delta_mm": -0.0077,
-  "sign_test_p_one_sided": 0.1094
+  "n_runs": 8,
+  "n_negative": 7,
+  "mean_delta_mm": -0.0094,
+  "sign_test_p_one_sided": 0.0352
  },
  "multiplicity_caveat": "THE PER-ARM VERDICTS ABOVE ARE NOMINAL AND NOT MULTIPLICITY-CORRECTED. Two arms were run and each was inspected at 1, 2 and 3 seeds, so at least six tests were performed on the same hypothesis. Any verdict that flips to ADOPT on a barely-excluded interval is optional stopping: the nominal p-value does not hold under a procedure that looks repeatedly and stops at the first crossing. Treat the pooled sign test as the summary and require a pre-registered confirmation run before adopting any single arm.",
  "caveats": [
